@@ -18,6 +18,10 @@ target_include_directories(imgui PUBLIC
 	imgui_sdl/
 	${SDL2_INCLUDE_DIRS})
 
+if (WIN32)
+    target_link_libraries(imgui PUBLIC imm32)
+endif()
+
 if (TARGET SDL2::SDL2)
     target_link_libraries(imgui PUBLIC SDL2::SDL2)
 else()
