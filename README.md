@@ -5,8 +5,6 @@
 This is the old branch of libblueberrn, which is no longer active nor currently maintained.
 Please use the latest [main](https://github.com/Buenia0/libblueberrn) branch instead.
 
-## END OF NOTICE
-
 Arcade machine emulation library, sorta
 
 The goal here is to help preserve the arcade machines of our past. But, also, you know, to have a fun challenge... :)
