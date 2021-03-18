@@ -1,4 +1,8 @@
+#ifdef __APPLE__
+#include <SDL.h>
+#else
 #include <SDL2/SDL.h>
+#endif
 #include <imgui.h>
 #include <imgui_sdl.h>
 #include <zip.h>
