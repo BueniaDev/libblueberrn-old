@@ -31,6 +31,6 @@ macOS-x86_64-apple_task:
     - build_script:
         - cd libblueberrn
         - mkdir build && cd build
-        - cmake .. -G "Unix Makefiles" -DBUILD_EXAMPLE="ON" -DCMAKE_BUILD_TYPE="Release"
+        - cmake .. -G "Unix Makefiles" -DBUILD_EXAMPLE="ON" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
         - make -j$(sysctl -n hw.ncpu)
   
