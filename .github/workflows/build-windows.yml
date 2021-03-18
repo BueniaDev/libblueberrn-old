@@ -30,10 +30,10 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: cmake $GITHUB_WORKSPACE -G "MSYS Makefiles" -DBUILD_EXAMPLE="ON" -DCMAKE_BUILD_TYPE="Release"
     - name: Make
-      working-directory: ${{runner.workspace}}/build
+      working-directory: ${{runner.workspace}}
       run: |
+	cd build
         make -j$(nproc --all)
-        cd ${{runner.workspace}}/build
         ../msys_dist.sh
     - uses: actions/upload-artifact@v1
       with:
