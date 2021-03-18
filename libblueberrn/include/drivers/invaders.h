@@ -43,7 +43,9 @@ namespace berrn
 	    vector<uint8_t> videoram;
 
 	private:
-	    const int cycles_per_half_frame = ((2 * 1000000) / 60) / 2; // 2 MHz at 60 fps, divided by two
+	    const int cpu_frequency = 2000000; // 2 MHz clock speed
+	    const int video_frequency = 60; // 60 FPS
+	    const int cycles_per_half_frame = (cpu_frequency / video_frequency) / 2; // 2 MHz at 60 fps, divided by two
 
 	    const uint8_t interrupt0 = 0xCF; // RST 1 at the start of VBlank
 	    const uint8_t interrupt1 = 0xD7; // RST 2 at the end of VBlank
@@ -51,7 +53,9 @@ namespace berrn
 	    const int width = 256;
 	    const int height = 224;
 
-	    int runHalfFrame();
+	    void runHalfFrame();
+
+	    int totalcycles = 0;
 
 	    void changePort1Bit(int bit, bool pressed);
 

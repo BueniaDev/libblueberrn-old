@@ -4,6 +4,8 @@ set(LIBBLUEBERRN
 	libblueberrn/src/core/libblueberrn.cpp
 	libblueberrn/src/drivers/example.cpp
 	libblueberrn/src/drivers/invaders.cpp
+	libblueberrn/src/drivers/galaxian.cpp
+	libblueberrn/src/drivers/pacman.cpp
 	PARENT_SCOPE)
 
 set(LIBBLUEBERRN_HEADERS
@@ -14,7 +16,6 @@ set(LIBBLUEBERRN_HEADERS
 	libblueberrn/include/drivers/berrndrivers.h
 	libblueberrn/include/drivers/example.h
 	libblueberrn/include/drivers/invaders.h
+	libblueberrn/include/drivers/galaxian.h
+	libblueberrn/include/drivers/pacman.h
 	PARENT_SCOPE)
-
-set(LIBBLUEBERRN_LIBRARIES ${CPU_LIBRARIES} PARENT_SCOPE)
-message(STATUS "Libraries: ${libbee8080}")

@@ -3,5 +3,7 @@
 
 #include <example.h>
 #include <invaders.h>
+#include <galaxian.h>
+#include <pacman.h>
 
 #endif // BERRN_DRIVERS

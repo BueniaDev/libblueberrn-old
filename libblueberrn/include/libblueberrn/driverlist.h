@@ -15,6 +15,8 @@ namespace berrn
 	{
 	    DRIVER(example);
 	    DRIVER(invaders);
+	    DRIVER(galaxian);
+	    DRIVER(pacman);
 	}
     };
 };

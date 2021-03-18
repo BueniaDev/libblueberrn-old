@@ -1,3 +1,4 @@
+message(STATUS "Building Bee8080...")
 add_subdirectory(8080/Bee8080)
 set(INTERFACE_HEADERS
 	"intel8080.h")

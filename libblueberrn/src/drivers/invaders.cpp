@@ -190,16 +190,14 @@ namespace berrn
 	} 
     }
 
-    int InvadersInterface::runHalfFrame()
+    void InvadersInterface::runHalfFrame()
     {
-	int cycles = cycles_per_half_frame;
-
-	while (cycles > 0)
+	while (totalcycles < cycles_per_half_frame)
 	{
-	    cycles -= core.runinstruction();
+	    totalcycles += core.runinstruction();
 	}
 
-	return cycles;
+	totalcycles = 0;
     }
 
     void InvadersInterface::changePort1Bit(int bit, bool pressed)
