@@ -26,7 +26,7 @@ jobs:
       run: |
         make -j$(sysctl -n hw.ncpu)
         mkdir -p dist
-        cp example/sdl2/example.app dist
+        cp -r example/sdl2/example.app dist
         mkdir -p dist/roms
         echo "Place your ROMs (in file or zip form) HERE!" > dist/roms/PLACE-ROMS-HERE.txt
     - uses: actions/upload-artifact@v1
