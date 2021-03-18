@@ -1,4 +1,11 @@
-<img src="https://github.com/Buenia0/libblueberrn/blob/main/res/logo.png" alt="drawing" width="300"/>
+<img src="https://github.com/Buenia0/libblueberrn/blob/old/res/logo.png" alt="drawing" width="300"/>
+
+## NOTICE
+
+This is the old branch of libblueberrn, which is no longer active nor currently maintained.
+Please use the latest [main](https://github.com/Buenia0/libblueberrn) branch instead.
+
+## END OF NOTICE
 
 Arcade machine emulation library, sorta
 
@@ -8,7 +15,7 @@ The goal here is to help preserve the arcade machines of our past. But, also, yo
 
 As of this time, libblueberrn is not able to run most commercial arcade ROMs, though some ROMs are beginning to boot. Please see the compatibility database for more details.
 
-[Link to compatibility database](https://github.com/Buenia0/libblueberrn-compatibility)
+(Compatibility database no longer available)
 
 # Plans
 
