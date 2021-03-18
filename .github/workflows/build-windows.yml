@@ -1,0 +1,40 @@
+name: CMake Build (Windows x86-64)
+
+on:
+  push:
+    branches:
+      - gh-actions
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+    - name: Install dependencies
+      run: pacman -Sq --noconfirm git base-devel mingw-w64-x86_64-{cmake,SDL2,toolchain}
+    - name: Create build environment
+      run: mkdir ${{runner.workspace}}/build
+    - name: Configure
+      working-directory: ${{runner.workspace}}/build
+      run: cmake $GITHUB_WORKSPACE -G "MSYS Makefiles" -DBUILD_EXAMPLE="ON" -DCMAKE_BUILD_TYPE="Release"
+    - name: Make
+      working-directory: ${{runner.workspace}}/build
+      run: |
+        make -j$(nproc --all)
+        ../msys_dist.sh
+    - uses: actions/upload-artifact@v1
+      with:
+        name: blueberrn-emu
+        path: ${{runner.workspace}}\\build\blueberrn-emu.exe
+      
