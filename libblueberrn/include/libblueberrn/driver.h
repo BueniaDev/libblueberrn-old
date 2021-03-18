@@ -113,6 +113,7 @@ namespace berrn
 	    virtual void resize(int width, int height, int scale) = 0;
 	    virtual void rendertex(BerrnTex tex) = 0;
 	    virtual void drawpixels() = 0;
+	    virtual string getdirpath(const string subdir = "", const string romPath = "") = 0;
 	    virtual bool isdirectory(string dirname) = 0;
 	    virtual bool loadzip(string filename) = 0;
 	    virtual vector<uint8_t> readfile(string filename) = 0;
@@ -336,6 +337,8 @@ namespace berrn
 	    bool is_dir_check = false;
 	    bool is_dir_exists = false;
 
+	    string romspath = "";
+
 	    vector<uint8_t> loadfile(string filename)
 	    {
 		vector<uint8_t> temp;
@@ -346,8 +349,9 @@ namespace berrn
 
 		if (!is_dir_check)
 		{
+		    romspath = front->getdirpath("roms");
 		    stringstream ss;
-		    ss << "roms/" << drivername();
+		    ss << romspath << drivername();
 		    is_dir_exists = front->isdirectory(ss.str());
 		    is_dir_check = true;
 		}
@@ -359,7 +363,8 @@ namespace berrn
 		else
 		{
 		    stringstream file_ss;
-		    file_ss << "roms/" << drivername() << "/" << filename;
+		    
+		    file_ss << front->getdirpath(drivername(), romspath) << filename;
 		    temp = front->readfile(file_ss.str());
 		}
 
@@ -378,7 +383,7 @@ namespace berrn
 		if (!is_zip_loaded)
 		{
 		    stringstream ss;
-		    ss << "roms/" << drivername() << ".zip";
+		    ss << romspath << drivername() << ".zip";
 		    if (!front->loadzip(ss.str()))
 		    {
 			cout << "Error loading ZIP file." << endl;

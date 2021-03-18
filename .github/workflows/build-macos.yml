@@ -31,6 +31,6 @@ jobs:
         echo "Place your ROMs (in file or zip form) HERE!" > dist/roms/PLACE-ROMS-HERE.txt
     - uses: actions/upload-artifact@v1
       with:
-        name: blueberrn-emu.app
+        name: blueberrn-emu
         path: ${{runner.workspace}}/build/dist
       

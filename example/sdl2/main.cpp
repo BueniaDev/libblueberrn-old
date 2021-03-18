@@ -57,7 +57,9 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	    surface = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);				
 	    cout << "Welcome to blueberrn-SDL." << endl;
-						
+
+	    initbasepath();
+			
 	    initui();						
 	    return true;
 	}
@@ -297,6 +299,25 @@ class SDL2Frontend : public BlueberrnFrontend
 	    }
 	}
 
+	void initbasepath()
+	{
+	    basePath = SDL_GetBasePath();
+	    pathSeparator = basePath.substr(basePath.length() - 1);
+	}
+
+	string getdirpath(const string subdir, const string romPath)
+	{
+	    string dirprefix = (romPath.empty()) ? basePath : romPath;
+	    stringstream ss;
+	    ss << dirprefix;
+	    if (!subdir.empty())
+	    {
+		ss << subdir << pathSeparator;
+	    }
+
+	    return ss.str();
+	}
+
 	bool isdirectory(string dirname)
 	{
 	    fs::path path = dirname;
@@ -323,7 +344,7 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	    if (!file.is_open())
 	    {
-		cout << "Unable to load " << filename << "." << endl;
+		cout << "Unable to load file." << endl;
 		return temp;
 	    }
 
@@ -331,7 +352,6 @@ class SDL2Frontend : public BlueberrnFrontend
 	    temp.resize(size, 0);
 	    file.seekg(0, ios::beg);
 	    file.read((char*)temp.data(), size);
-	    cout << filename << " succesfully loaded." << endl;
 	    file.close();
 	    return temp;
 	}
@@ -410,6 +430,9 @@ class SDL2Frontend : public BlueberrnFrontend
 	};
 		
 	queue<SDL2Tex> maintex;
+
+	string basePath = "";
+	string pathSeparator = "";
 };
 
 BlueberrnCore core;
