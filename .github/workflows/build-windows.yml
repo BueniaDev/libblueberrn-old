@@ -32,7 +32,7 @@ jobs:
     - name: Make
       working-directory: ${{runner.workspace}}
       run: |
-	cd build
+        cd build
         make -j$(nproc --all)
         ../msys_dist.sh
     - uses: actions/upload-artifact@v1
