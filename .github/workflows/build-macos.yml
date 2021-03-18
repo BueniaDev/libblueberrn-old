@@ -1,0 +1,36 @@
+name: CMake Build (macOS x86-64)
+
+on:
+  push:
+    branches:
+      - gh-actions
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    - name: Install dependencies
+      working-directory: ${{runner.workspace}}
+      run: brew install cmake pkg-config sdl2
+    - name: Create build environment
+      run: mkdir ${{runner.workspace}}/build
+    - name: Configure
+      working-directory: ${{runner.workspace}}/build
+      run: cmake $GITHUB_WORKSPACE -DBUILD_EXAMPLE="ON" -DCMAKE_BUILD_TYPE="Release"
+    - name: Make
+      working-directory: ${{runner.workspace}}/build
+      run: |
+        make -j$(sysctl -n hw.ncpu)
+        mkdir -p dist
+        cp example/sdl2/example.app dist
+        mkdir -p dist/roms
+        echo "Place your ROMs (in file or zip form) HERE!" > dist/roms/PLACE-ROMS-HERE.txt
+    - uses: actions/upload-artifact@v1
+      with:
+        name: blueberrn-emu.app
+        path: ${{runner.workspace}}/build/dist
+      
