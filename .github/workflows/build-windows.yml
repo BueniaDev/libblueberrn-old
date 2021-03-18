@@ -33,7 +33,7 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: |
         make -j$(nproc --all)
-	cd ${{runner.workspace}}/build
+        cd ${{runner.workspace}}/build
         ../msys_dist.sh
     - uses: actions/upload-artifact@v1
       with:
