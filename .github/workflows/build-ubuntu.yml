@@ -1,0 +1,29 @@
+name: CMake Build (Ubuntu x86-64)
+
+on:
+  push:
+    branches:
+      - gh-actions
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install cmake pkg-config libsdl2-dev
+    - name: Create build environment
+      run: mkdir ${{runner.workspace}}/build
+    - name: Configure
+      working-directory: ${{runner.workspace}}/build
+      run: cmake $GITHUB_WORKSPACE -DBUILD_EXAMPLE="ON" -DCMAKE_BUILD_TYPE="Release"
+    - name: Make
+      working-directory: ${{runner.workspace}}/build
+      run: |
+        make -j$(nproc --all)
+      
