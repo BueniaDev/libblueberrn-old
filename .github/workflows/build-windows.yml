@@ -24,7 +24,8 @@ jobs:
     - name: Install dependencies
       run: pacman -Sq --noconfirm git base-devel mingw-w64-x86_64-{cmake,SDL2,toolchain}
     - name: Create build environment
-      run: mkdir ${{runner.workspace}}/build
+      working-directory: ${{runner.workspace}}
+      run: mkdir build
     - name: Configure
       working-directory: ${{runner.workspace}}/build
       run: cmake $GITHUB_WORKSPACE -G "MSYS Makefiles" -DBUILD_EXAMPLE="ON" -DCMAKE_BUILD_TYPE="Release"
