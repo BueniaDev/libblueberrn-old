@@ -22,7 +22,7 @@ jobs:
         msystem: MINGW64
         update: true
     - name: Install dependencies
-      run: pacman -Sq --noconfirm git base-devel mingw-w64-x86_64-{cmake,SDL2,toolchain}
+      run: pacman -Sq --noconfirm git make mingw-w64-x86_64-{cmake,SDL2,toolchain}
     - name: Create build environment
       working-directory: ${{runner.workspace}}
       run: mkdir build
@@ -33,9 +33,10 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: |
         make -j$(nproc --all)
+	cd ${{runner.workspace}}/build
         ../msys_dist.sh
     - uses: actions/upload-artifact@v1
       with:
         name: blueberrn-emu
-        path: ${{runner.workspace}}\\build\blueberrn-emu.exe
+        path: ${{runner.workspace}}\\build\\dist\
       
