@@ -26,4 +26,12 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: |
         make -j$(nproc --all)
+        mkdir -p dist
+        cp example/sdl2/example dist
+        mkdir -p dist/roms
+        echo "Place your ROMs (in file or zip form) HERE!" > dist/roms/PLACE-ROMS-HERE.txt
+    - uses: actions/upload-artifact@v1
+      with:
+        name: blueberrn-emu
+        path: ${{runner.workspace}}/build/dist
       
