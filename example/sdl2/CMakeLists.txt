@@ -20,3 +20,10 @@ if (TARGET SDL2::SDL2)
 else()
     target_link_libraries(example ${SDL2_LIBRARIES})
 endif()
+
+if (APPLE)
+    set_target_properties(example PROPERTIES
+                         MACOSX_BUNDLE true
+                         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/blueberrn.plist.in
+                         OUTPUT_NAME example)
+endif()
