@@ -3,7 +3,10 @@ name: CMake Build (Ubuntu x86-64)
 on:
   push:
     branches:
-      - gh-actions
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
