@@ -1,5 +1,25 @@
+/*
+    This file is part of libblueberrn.
+    Copyright (C) 2021 BueniaDev.
+
+    libblueberrn is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    libblueberrn is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 #include <invaders.h>
 using namespace berrn;
+using namespace std;
+using namespace std::placeholders;
 
 namespace berrn
 {
@@ -84,9 +104,17 @@ namespace berrn
 	switch (port)
 	{
 	    case 2: shifter.setshiftoffs(val); break;
-	    case 3: break; // TODO: Sound support
+	    case 3:
+	    {
+		playSound(val, false);
+	    }
+	    break;
 	    case 4: shifter.fillshiftreg(val); break;
-	    case 5: break; // TODO: Sound support
+	    case 5:
+	    {
+		playSound(val, true);
+	    }
+	    break;
 	    case 6: /* debugPort(val); */ break;
 	    default:
 	    {
@@ -95,6 +123,24 @@ namespace berrn
 	    }
 	    break;
 	}
+    }
+
+    void InvadersInterface::loadSound(int id)
+    {
+	soundIDs.push_back(id);
+    }
+
+    void InvadersInterface::playSound(uint8_t val, bool bank)
+    {
+	if (soundfunc)
+	{
+	    soundfunc(val, bank);
+	}
+    }
+
+    void InvadersInterface::setsoundfunc(invsoundfunc cb)
+    {
+	soundfunc = cb;
     }
 
     void InvadersInterface::init()
@@ -112,6 +158,7 @@ namespace berrn
 	// Reset port 1
 	port1 = 0;
 	core.shutdown();
+	soundIDs.clear();
 	videoram.clear();
 	workram.clear();
 	gamerom.clear();
@@ -252,16 +299,39 @@ namespace berrn
 
     bool driverinvaders::drvinit()
     {
+	prev_port3 = bitset<4>(0);
+	prev_port5 = bitset<5>(0);
 	inter.init();
-	loadROM("invaders.h", 0, 0x800, inter.gamerom);
-	loadROM("invaders.g", 0x800, 0x800, inter.gamerom);
-	loadROM("invaders.f", 0x1000, 0x800, inter.gamerom);
-	loadROM("invaders.e", 0x1800, 0x800, inter.gamerom);
+	inter.setsoundfunc(bind(&driverinvaders::invadersSound, this, _1, _2));
+	loadROM("invaders.h", 0x0000, 0x0800, inter.gamerom);
+	loadROM("invaders.g", 0x0800, 0x0800, inter.gamerom);
+	loadROM("invaders.f", 0x1000, 0x0800, inter.gamerom);
+	loadROM("invaders.e", 0x1800, 0x0800, inter.gamerom);
+
+	loadInvSound("8.wav"); // UFO sound
+	loadInvSound("1.wav"); // shoot sound
+	loadInvSound("2.wav"); // player die
+	loadInvSound("3.wav"); // alien die
+	loadInvSound("4.wav"); // alien move 1
+	loadInvSound("5.wav"); // alien move 2
+	loadInvSound("6.wav"); // alien move 3
+	loadInvSound("7.wav"); // alien move 4
+	loadInvSound("10.wav"); // UFO hit
+
+	for (int i = 0; i < 9; i++)
+	{
+	    setSoundVol(i, 0.25);
+	}
 
 	framebuffer.resize((256 * 224), black());
 	resize(224, 256, 2);
     
 	return isallfilesloaded();
+    }
+
+    void driverinvaders::loadInvSound(string filename)
+    {
+	soundIDs.push_back(loadWAV(filename));
     }
 
     void driverinvaders::drvshutdown()
@@ -274,6 +344,68 @@ namespace berrn
 	inter.run();
 	inter.updatepixels(framebuffer);
 	filltexrect(0, 0, 224, 256, framebuffer);
+	outputSamples();
+    }
+
+    void driverinvaders::invadersSound(uint8_t val, bool bank)
+    {
+	if (!bank)
+	{
+	    bitset<4> port3_val = bitset<4>(val);
+
+	    if (port3_val.test(0) && !prev_port3.test(0))
+	    {
+		playSound(soundIDs[0]);
+	    }
+
+	    if (port3_val.test(1) && !prev_port3.test(1))
+	    {
+		playSound(soundIDs[1]);
+	    }
+
+	    if (port3_val.test(2) && !prev_port3.test(2))
+	    {
+		playSound(soundIDs[2]);
+	    }
+
+	    if (port3_val.test(3) && !prev_port3.test(3))
+	    {
+		playSound(soundIDs[3]);
+	    }
+
+	    prev_port3 = port3_val;
+	}
+	else
+	{
+	    bitset<5> port5_val = bitset<5>(val);
+
+	    if (port5_val.test(0) && !prev_port5.test(0))
+	    {
+		playSound(soundIDs[4]);
+	    }
+
+	    if (port5_val.test(1) && !prev_port5.test(1))
+	    {
+		playSound(soundIDs[5]);
+	    }
+
+	    if (port5_val.test(2) && !prev_port5.test(2))
+	    {
+		playSound(soundIDs[6]);
+	    }
+
+	    if (port5_val.test(3) && !prev_port5.test(3))
+	    {
+		playSound(soundIDs[7]);
+	    }
+
+	    if (port5_val.test(4) && !prev_port5.test(4))
+	    {
+		playSound(soundIDs[8]);
+	    }
+
+	    prev_port5 = port5_val;
+	}
     }
 
     void driverinvaders::drvcoin(bool pressed)

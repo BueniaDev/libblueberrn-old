@@ -6,4 +6,7 @@
 	url = https://github.com/Tyyppi77/imgui_sdl.git
 [submodule "libblueberrn/components/cpu/8080/Bee8080"]
 	path = libblueberrn/components/cpu/8080/Bee8080
-	url = https://github.com/Buenia0/Bee8080.git
+	url = https://github.com/BueniaDev/Bee8080.git
+[submodule "libblueberrn/components/cpu/z80/BeeZ80"]
+	path = libblueberrn/components/cpu/z80/BeeZ80
+	url = https://github.com/BueniaDev/BeeZ80.git

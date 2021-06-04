@@ -9,6 +9,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <functional>
 #include <filesystem>
 #include <queue>
 #include <libblueberrn/libblueberrn.h>
@@ -16,6 +17,7 @@
 namespace fs = std::filesystem;
 using namespace berrn;
 using namespace std;
+using namespace std::placeholders;
 
 class SDL2Frontend : public BlueberrnFrontend
 {
@@ -33,27 +35,38 @@ class SDL2Frontend : public BlueberrnFrontend
 	bool init()
 	{
 	    isdriverloaded = !core->nocmdarguments();
-	    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+	    if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
 	    {
-		sdl_error("SDL could not be initialized!");
-		return false;
+		return sdl_error("SDL could not be initialized!");
 	    }
 						
 	    window = SDL_CreateWindow("blueberrn-SDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN);
 		
 	    if (window == NULL)
 	    {
-		sdl_error("Window could not be created!");
-		return false;
+		return sdl_error("Window could not be created!");
 	    }
 						
 	    render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 				
 	    if (render == NULL)
 	    {
-		sdl_error("Renderer could not be created!");
-		return false;
+		return sdl_error("Renderer could not be created!");
 	    }
+
+	    SDL_AudioSpec audiospec;
+	    audiospec.format = AUDIO_S16SYS;
+	    audiospec.freq = 48000;
+	    audiospec.samples = 4096;
+	    audiospec.channels = 2;
+	    audiospec.callback = NULL;
+
+	    if (SDL_OpenAudio(&audiospec, NULL) < 0)
+	    {
+		return sdl_error("Could not open audio!");
+	    }
+
+	    // SDL_PauseAudio(!isdriverloaded);
 
 	    surface = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);				
 	    cout << "Welcome to blueberrn-SDL." << endl;
@@ -91,6 +104,7 @@ class SDL2Frontend : public BlueberrnFrontend
 	{
 	    ImGuiSDL::Deinitialize();
 	    ImGui::DestroyContext();
+	    SDL_CloseAudio();
 	    SDL_DestroyTexture(texture);
 	    SDL_DestroyRenderer(render);
 	    SDL_DestroyWindow(window);
@@ -123,6 +137,7 @@ class SDL2Frontend : public BlueberrnFrontend
 			core->startdriver();
 			driverselbox = false;
 			isdriverloaded = true;
+			// SDL_PauseAudio(0);
 		    }
 		}
 	    }
@@ -149,6 +164,7 @@ class SDL2Frontend : public BlueberrnFrontend
 			if (isdriverloaded)
 			{
 			    core->stopdriver();
+			    // SDL_PauseAudio(1);
 			    resize(startwidth, startheight, 1);
 			    initsplash();
 			    isdriverloaded = false;
@@ -258,9 +274,10 @@ class SDL2Frontend : public BlueberrnFrontend
 	    SDL_RenderPresent(render);
 	}
 				
-	void sdl_error(string message)
+	bool sdl_error(string message)
 	{
 	    cout << message << " SDL_Error: " << SDL_GetError() << endl;
+	    return false;
 	}
 				
 	void resize(int w, int h, int s)
@@ -393,6 +410,75 @@ class SDL2Frontend : public BlueberrnFrontend
 		zip = NULL;
 	    }
 	}
+
+	// Audio code (using placeholder code for now)
+	// TODO: Properly implement audio logic
+
+	int loadWAV(string filename)
+	{
+	    cout << "Loading WAV with filename of " << filename << endl;
+	    int id = samplesounds.size();
+
+	    cout << "Sound " << dec << id << " succesfully loaded." << endl;
+
+	    samplesounds.push_back(0);
+	    return id;
+	}
+
+	bool hasSounds()
+	{
+	    return !samplesounds.empty();
+	}
+
+	bool playSound(int id)
+	{
+	    if ((id < 0) || (id >= static_cast<int>(samplesounds.size())))
+	    {
+		return false;
+	    }
+
+	    cout << "Playing sound of " << dec << id << endl;
+	    return true;
+	}
+
+	bool setSoundVol(int id, double vol)
+	{
+	    if ((id < 0) || (id >= static_cast<int>(samplesounds.size())))
+	    {
+		return false;
+	    }
+
+	    if ((vol < 0.0) || (vol > 1.0))
+	    {
+		return false;
+	    }
+
+	    cout << "Setting gain of sound " << dec << (int)id << " to " << vol << endl;
+	    return true;
+	}
+
+	array<int16_t, 2> getMixedSamples()
+	{
+	    array<int16_t, 2> samples;
+	    samples[0] = 0;
+	    samples[1] = 0;
+	    return samples;
+	}
+
+	void freeSounds()
+	{
+	    cout << "Clearing " << dec << (int)samplesounds.size() << " sounds..." << endl;
+	    samplesounds.clear();
+	}
+
+	void audioCallback(array<int16_t, 2> samples)
+	{
+	    int16_t left = samples[0];
+	    int16_t right = samples[1];
+	    cout << "Left sample: " << dec << (int)left << endl;
+	    cout << "Right sample: " << dec << (int)right << endl;
+	    cout << endl;
+	}
 		
 	SDL_Window *window = NULL;
 	SDL_Renderer *render = NULL;
@@ -430,6 +516,8 @@ class SDL2Frontend : public BlueberrnFrontend
 	};
 		
 	queue<SDL2Tex> maintex;
+
+	vector<int> samplesounds;
 
 	string basePath = "";
 	string pathSeparator = "";

@@ -16,10 +16,10 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef LIBBLUEBERRN_8080_H
-#define LIBBLUEBERRN_8080_H
+#ifndef LIBBLUEBERRN_Z80_H
+#define LIBBLUEBERRN_Z80_H
 
-#include "8080/Bee8080/bee8080.h"
-using namespace bee8080;
+#include "z80/BeeZ80/beez80.h"
+using namespace beez80;
 
-#endif // LIBBLUEBERRN_8080_H
+#endif // LIBBLUEBERRN_Z80_H

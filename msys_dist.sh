@@ -15,4 +15,6 @@ if [ -d "example/sdl2" ]; then
 fi
 
 mkdir -p dist/roms
+mkdir -p dist/samples
 echo "Place your ROMs (in file or zip form) HERE!" > dist/roms/PLACE-ROMS-HERE.txt
+echo "Place your samples (in file form) HERE!" > dist/samples/PLACE-SAMPLES-HERE.txt

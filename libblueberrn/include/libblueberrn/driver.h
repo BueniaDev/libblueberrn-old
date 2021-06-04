@@ -1,10 +1,12 @@
 #ifndef BERRN_DRIVER
 #define BERRN_DRIVER
 
-#include <vector>
-#include <string>
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <vector>
+#include <array>
+#include <bitset>
 #include <libblueberrn_api.h>
 using namespace std;
 
@@ -119,6 +121,13 @@ namespace berrn
 	    virtual vector<uint8_t> readfile(string filename) = 0;
 	    virtual vector<uint8_t> readfilefromzip(string filename) = 0;
 	    virtual void closezip() = 0;
+	    virtual int loadWAV(string filename) = 0;
+	    virtual bool hasSounds() = 0;
+	    virtual bool playSound(int id) = 0;
+	    virtual bool setSoundVol(int id, double vol) = 0;
+	    virtual array<int16_t, 2> getMixedSamples() = 0;
+	    virtual void freeSounds() = 0;
+	    virtual void audioCallback(array<int16_t, 2> samples) = 0;
     };
 	
     class LIBBLUEBERRN_API BlueberrnVideo : public bernnvideo
@@ -256,6 +265,47 @@ namespace berrn
 		}
 	    }
 
+	    int loadWAV(string filename)
+	    {
+		return loadSoundWAV(filename);
+	    }
+
+	    bool setSoundVol(int id, double vol)
+	    {
+		if (front == NULL)
+		{
+		    return false;
+		}
+
+		return front->setSoundVol(id, vol);
+	    }
+
+	    bool playSound(int id)
+	    {
+		if (front == NULL)
+		{
+		    return false;
+		}
+
+		return front->playSound(id);
+	    }
+
+	    void outputSamples()
+	    {
+		if (front == NULL)
+		{
+		    return;
+		}
+
+		if (!front->hasSounds())
+		{
+		    return;
+		}
+
+		// array<int16_t, 2> samples = front->getMixedSamples();
+		// front->audioCallback(samples);
+	    }
+
 	    void drawpixels()
 	    {
 		if (video != NULL)
@@ -283,6 +333,8 @@ namespace berrn
 		closefiles();
 		is_dir_check = false;
 		is_dir_exists = false;
+		is_samples_dir = false;
+		is_samples_dir_exists = false;
 	    }
 
 	    void keypressed(BerrnInput key)
@@ -337,7 +389,42 @@ namespace berrn
 	    bool is_dir_check = false;
 	    bool is_dir_exists = false;
 
+	    bool is_samples_dir = false;
+	    bool is_samples_dir_exists = false;
+
 	    string romspath = "";
+
+	    string samplespath = "";
+
+	    int loadSoundWAV(string filename)
+	    {
+		if (front == NULL)
+		{
+		    return -1;
+		}
+
+		if (!is_samples_dir)
+		{
+		    samplespath = front->getdirpath("samples");
+
+		    stringstream ss;
+		    ss << samplespath << drivername();
+
+		    is_samples_dir_exists = front->isdirectory(ss.str());
+		    is_samples_dir = true;
+		}
+
+		if (!is_samples_dir_exists)
+		{
+		    // TODO: Implement loading samples from ZIP files?
+		    return false;
+		}
+
+		stringstream samples_ss;
+		    
+		samples_ss << front->getdirpath(drivername(), samplespath) << filename;
+		return front->loadWAV(samples_ss.str());
+	    }
 
 	    vector<uint8_t> loadfile(string filename)
 	    {
@@ -404,11 +491,17 @@ namespace berrn
 		    return;
 		}
 
+		if (front->hasSounds())
+		{
+		    front->freeSounds();
+		}
+
 		if (is_zip_loaded)
 		{
 		    front->closezip();
 		    is_zip_loaded = false;
 		}
+
 	    }
 
 	    bool loadsingleROM(string filename, uint64_t start, uint64_t size, vector<uint8_t> &finaldata)
