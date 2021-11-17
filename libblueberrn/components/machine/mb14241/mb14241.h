@@ -48,7 +48,4 @@ namespace mb14241
     };
 };
 
-
-
-
 #endif // LIBBLUEBERRN_MB14241_SHIFTER_H

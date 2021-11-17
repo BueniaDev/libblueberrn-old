@@ -29,32 +29,52 @@ using namespace std;
 
 namespace berrn
 {
-    class LIBBLUEBERRN_API PacmanInterface : public BeeZ80Interface
+    class LIBBLUEBERRN_API PacmanInterface : public BerrnInterface
     {
 	public:
 	    PacmanInterface();
 	    ~PacmanInterface();
 
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t val);
-	    uint8_t portIn(uint8_t port);
-	    void portOut(uint8_t port, uint8_t val);
-
 	    void init();
 	    void shutdown();
-	    void reset();
-	    void run();
 
-	    vector<uint8_t> gamerom;
+	    uint8_t readCPU8(uint16_t addr);
+	    void writeCPU8(uint16_t addr, uint8_t data);
+	    uint8_t readOp8(uint16_t addr);
+	    void portOut(uint16_t port, uint8_t val);
+	    void updatePixels();
+
+	    vector<uint8_t> &get_gamerom()
+	    {
+		return gamerom;
+	    }
+
+	    bool is_vblank_enabled()
+	    {
+		return vblank_enable;
+	    }
+
+	    uint8_t get_int_vec()
+	    {
+		return int_vector;
+	    }
 
 	private:
-	    BeeZ80 core;
+	    uint8_t readByte(uint16_t addr);
 
-	    const int cpu_frequency = 3072000; // 3.072 MHz clock speed
-	    const int video_frequency = 60; // 60 FPS
-	    const int cycles_per_frame = (cpu_frequency / video_frequency); // 3.072 MHz at 60 fps
+	    void writeIO(int addr, uint8_t data);
 
-	    int totalcycles = 0;
+	    vector<uint8_t> gamerom;
+	    array<uint8_t, 0x400> vram;
+	    array<uint8_t, 0x400> cram;
+	    array<uint8_t, 0x3F0> mainram;
+	    array<uint8_t, 0x10> oam;
+	    array<uint8_t, 0x10> sprite_pos;
+	    bool vblank_enable = false;
+	    bool sound_enable = false;
+	    bool flip_screen = false;
+
+	    uint8_t int_vector = 0;
     };
 
     class LIBBLUEBERRN_API driverpacman : public berrndriver
@@ -66,18 +86,25 @@ namespace berrn
 	    string drivername();
 	    bool hasdriverROMs();
 
+	    virtual void loadROMs();
+
 	    bool drvinit();
 	    void drvshutdown();
 	    void drvrun();
 
-	    void drvcoin(bool pressed);
-	    void drvstartp1(bool pressed);
-	    void drvleftp1(bool pressed);
-	    void drvrightp1(bool pressed);
-	    void drvfirep1(bool pressed);
+	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
 	    PacmanInterface inter;
+	    BerrnScheduler scheduler;
+
+	    void interrupt_handler();
+
+	    BerrnZ80Processor *pacman_proc = NULL;
+	    BerrnCPU *pacman_cpu = NULL;
+
+	    BerrnTimer *interrupt_timer = NULL;
+	    BerrnTimer *vblank_timer = NULL;
     };
 };
 

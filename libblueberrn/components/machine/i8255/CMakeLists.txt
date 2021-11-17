@@ -1,0 +1,3 @@
+set(I8255_HEADERS
+	"i8255.h"
+	PARENT_SCOPE)

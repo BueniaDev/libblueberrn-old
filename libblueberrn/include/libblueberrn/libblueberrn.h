@@ -40,6 +40,7 @@ namespace berrn
 	    void stopdriver(bool isready = true);
 	    void rundriver();
 
+	    void keychanged(BerrnInput key, bool is_pressed);
 	    void keypressed(BerrnInput key);
 	    void keyreleased(BerrnInput key);
       

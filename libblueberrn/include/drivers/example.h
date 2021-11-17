@@ -41,11 +41,7 @@ namespace berrn
 	    void drvshutdown();
 	    void drvrun();
 
-	    void drvcoin(bool pressed);
-	    void drvstartp1(bool pressed);
-	    void drvleftp1(bool pressed);
-	    void drvrightp1(bool pressed);
-	    void drvfirep1(bool pressed);
+	    void keychanged(BerrnInput key, bool is_pressed);
     };
 };
 

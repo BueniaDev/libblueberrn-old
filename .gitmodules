@@ -1,8 +1,8 @@
-[submodule "example/sdl2/external/imgui"]
-	path = example/sdl2/external/imgui
+[submodule "blueberrn-SDL/external/imgui"]
+	path = blueberrn-SDL/external/imgui
 	url = https://github.com/ocornut/imgui.git
-[submodule "example/sdl2/external/imgui_sdl"]
-	path = example/sdl2/external/imgui_sdl
+[submodule "blueberrn-SDL/external/imgui_sdl"]
+	path = blueberrn-SDL/external/imgui_sdl
 	url = https://github.com/Tyyppi77/imgui_sdl.git
 [submodule "libblueberrn/components/cpu/8080/Bee8080"]
 	path = libblueberrn/components/cpu/8080/Bee8080

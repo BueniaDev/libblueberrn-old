@@ -107,20 +107,22 @@ namespace berrn
 	driver->drawpixels();
     }
 
-    void BlueberrnCore::keypressed(BerrnInput key)
+    void BlueberrnCore::keychanged(BerrnInput key, bool is_pressed)
     {
 	if (driver != NULL)
 	{
-	    driver->keypressed(key);
+	    driver->keychanged(key, is_pressed);
 	}
+    }
+
+    void BlueberrnCore::keypressed(BerrnInput key)
+    {
+	keychanged(key, true);
     }
 
     void BlueberrnCore::keyreleased(BerrnInput key)
     {
-	if (driver != NULL)
-	{
-	    driver->keyreleased(key);
-	}
+	keychanged(key, false);
     }
   
     void BlueberrnCore::setfrontend(BlueberrnFrontend *cb)

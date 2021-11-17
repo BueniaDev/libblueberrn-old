@@ -58,43 +58,8 @@ namespace berrn
 	fillrect(50, 50, 100, 100, green());
     }
 
-    void driverexample::drvcoin(bool pressed)
+    void driverexample::keychanged(BerrnInput key, bool is_pressed)
     {
-	if (pressed)
-	{
-	    cout << "Coin button pressed" << endl;
-	}
-    }
-
-    void driverexample::drvstartp1(bool pressed)
-    {
-	if (pressed)
-	{
-	    cout << "Start button pressed" << endl;
-	}
-    }
-
-    void driverexample::drvleftp1(bool pressed)
-    {
-	if (pressed)
-	{
-	    cout << "Left button pressed" << endl;
-	}
-    }
-
-    void driverexample::drvrightp1(bool pressed)
-    {
-	if (pressed)
-	{
-	    cout << "Right button pressed" << endl;
-	}
-    }
-
-    void driverexample::drvfirep1(bool pressed)
-    {
-	if (pressed)
-	{
-	    cout << "Fire button pressed" << endl;
-	}
+	return;
     }
 };

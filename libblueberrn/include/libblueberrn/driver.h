@@ -12,6 +12,43 @@ using namespace std;
 
 namespace berrn
 {
+    template<typename T>
+    bool testbit(T reg, int bit)
+    {
+	return ((reg >> bit) & 1) ? true : false;
+    }
+
+    template<typename T>
+    T setbit(T reg, int bit)
+    {
+	return (reg | (1 << bit));
+    }
+
+    template<typename T>
+    T resetbit(T reg, int bit)
+    {
+	return (reg & ~(1 << bit));
+    }
+
+    template<typename T>
+    T changebit(T reg, int bit, bool val)
+    {
+	if (val == true)
+	{
+	    return setbit(reg, bit);
+	}
+	else
+	{
+	    return resetbit(reg, bit);
+	}
+    }
+
+    template<typename T>
+    bool inRange(T value, T low, T high)
+    {
+	return ((value >= low) && (value < high));
+    }
+
     struct berrnRGBA
     {
 	uint8_t red;
@@ -257,6 +294,16 @@ namespace berrn
 		}
 	    }
 
+	    template<size_t size>
+	    void filltexrect(int x, int y, int width, int height, array<berrnRGBA, size> colorbuffer)
+	    {
+		vector<berrnRGBA> buffer = vector<berrnRGBA>(colorbuffer.begin(), colorbuffer.end());
+		if (video != NULL)
+		{
+		    video->filltexrect(x, y, width, height, buffer);
+		}
+	    }
+
 	    void filltexrect(int x, int y, int width, int height, vector<berrnRGBA> colorbuffer)
 	    {
 		if (video != NULL)
@@ -337,31 +384,7 @@ namespace berrn
 		is_samples_dir_exists = false;
 	    }
 
-	    void keypressed(BerrnInput key)
-	    {
-		switch (key)
-		{
-		    case BerrnInput::BerrnCoin: drvcoin(true); break;
-		    case BerrnInput::BerrnStartP1: drvstartp1(true); break;
-		    case BerrnInput::BerrnLeftP1: drvleftp1(true); break;
-		    case BerrnInput::BerrnRightP1: drvrightp1(true); break;
-		    case BerrnInput::BerrnFireP1: drvfirep1(true); break;
-		    default: break;
-		}
-	    }
-
-	    void keyreleased(BerrnInput key)
-	    {
-		switch (key)
-		{
-		    case BerrnInput::BerrnCoin: drvcoin(false); break;
-		    case BerrnInput::BerrnStartP1: drvstartp1(false); break;
-		    case BerrnInput::BerrnLeftP1: drvleftp1(false); break;
-		    case BerrnInput::BerrnRightP1: drvrightp1(false); break;
-		    case BerrnInput::BerrnFireP1: drvfirep1(false); break;
-		    default: break;
-		}
-	    }
+	    virtual void keychanged(BerrnInput key, bool is_pressed) = 0;
 
 	    bool isallfilesloaded()
 	    {
@@ -373,12 +396,6 @@ namespace berrn
 	    virtual bool drvinit() = 0;
 	    virtual void drvshutdown() = 0;
 	    virtual void drvrun() = 0;
-
-	    virtual void drvcoin(bool pressed) = 0;
-	    virtual void drvstartp1(bool pressed) = 0;
-	    virtual void drvleftp1(bool pressed) = 0;
-	    virtual void drvrightp1(bool pressed) = 0;
-	    virtual void drvfirep1(bool pressed) = 0;
       
 	    BlueberrnVideo *video = NULL;
 	    BlueberrnFrontend *front = NULL;

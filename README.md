@@ -1,4 +1,4 @@
-<img src="https://github.com/Buenia0/libblueberrn/blob/main/res/logo.png" alt="drawing" width="300"/>
+<img src="https://github.com/BueniaDev/libblueberrn/blob/main/res/logo.png" alt="drawing" width="300"/>
 
 Arcade machine emulation library, sorta
 
@@ -8,7 +8,7 @@ The goal here is to help preserve the arcade machines of our past. But, also, yo
 
 As of this time, libblueberrn is not able to run most commercial arcade ROMs, though some ROMs are beginning to boot. Please see the compatibility database for more details.
 
-[Link to compatibility database](https://github.com/Buenia0/libblueberrn-compatibility)
+[Link to compatibility database](https://github.com/BueniaDev/libblueberrn-compatibility)
 
 # Building Instructions
 
@@ -65,7 +65,7 @@ OpenSUSE: (not tested): `sudo zypper in libSDL2-devel`
 Step 2: Clone the repository:
 
 ```
-git clone --recursive https://github.com/Buenia0/libblueberrn.git
+git clone --recursive https://github.com/BueniaDev/libblueberrn.git
 cd libblueberrn
 ```
 
@@ -97,7 +97,7 @@ brew install sdl2
 Step 2: Clone the repository:
 
 ```
-git clone --recursive https://github.com/Buenia0/libblueberrn.git
+git clone --recursive https://github.com/BueniaDev/libblueberrn.git
 cd libblueberrn
 ```
 
@@ -129,7 +129,7 @@ pacman -S mingw-w64-x86_64-SDL2
 Step 2: Clone the repository:
 
 ```
-git clone --recursive https://github.com/Buenia0/libblueberrn.git
+git clone --recursive https://github.com/BueniaDev/libblueberrn.git
 cd libblueberrn
 ```
 
@@ -149,19 +149,19 @@ cmake .. -G "MSYS Makefiles" -DBUILD_EXAMPLE="<ON/OFF>" -DCMAKE_BUILD_TYPE="<Deb
 
 Improve Midway Space Invaders hardware support
 
-Namco Galaxian hardware support
+Improve Namco Galaxian hardware support
 
-Namco Pacman hardware support
+Improve Namco Pacman hardware support
 
-Sega System 1 hardware support
+Capcom Mitchell hardware support
 
 ## Medium-term
+
+Sega System 1 hardware support
 
 Sega System 16 hardware support
 
 Namco Galaga hardware support
-
-SNK Neo Geo MVS support
 
 Capcom CPS-1 support
 
@@ -184,7 +184,7 @@ libblueberrn is free software: you can redistribute it and/or modify it under th
 
 # Copyright
 
-(C) 2021 Buenia. This project is not affiliated in any way with Taito, Namco, Midway, or any of the manufacturers of the arcade machines supported in this project. All arcade games and their logos/brandings featured herein are the registered trademarks of their respective owners.
+(C) 2021 BueniaDev. This project is not affiliated in any way with Taito, Namco, Midway, or any of the manufacturers of the arcade machines supported in this project. All arcade games and their logos/brandings featured herein are the registered trademarks of their respective owners.
 
 All copyrighted material in this repository belongs to their respective owners, and is used under the terms of the "fair use" clause of U.S. and international copyright law. For more information, see the "res/fairuse.txt" file in this repository.
 
