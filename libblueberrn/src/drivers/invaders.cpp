@@ -107,12 +107,111 @@ namespace berrn
 	switch (port)
 	{
 	    case 2: shifter.setshiftoffs(val); break;
-	    case 3: break;
+	    case 3: write_sound_port(0, val); break;
 	    case 4: shifter.fillshiftreg(val); break;
-	    case 5: break;
+	    case 5: write_sound_port(1, val); break;
 	    case 6: /* debugPort(val); */ break;
 	    default: BerrnInterface::portOut(port, val); break;
 	}
+    }
+
+    void InvadersInterface::write_sound_port(int bank, uint8_t val)
+    {
+	if (bank == 0)
+	{
+	    if (testbit(val, 0) && !testbit(prev_port3, 0))
+	    {
+		play_sound(0, true);
+	    }
+	    else if (!testbit(val, 0) && testbit(prev_port3, 0))
+	    {
+		play_sound(0, false);
+	    }
+
+	    if (testbit(val, 1) && !testbit(prev_port3, 1))
+	    {
+		play_sound(1);
+	    }
+
+	    if (testbit(val, 2) && !testbit(prev_port3, 2))
+	    {
+		play_sound(2);
+	    }
+
+	    if (testbit(val, 3) && !testbit(prev_port3, 3))
+	    {
+		play_sound(3);
+	    }
+
+	    if (testbit(val, 4) && !testbit(prev_port3, 4))
+	    {
+		play_sound(9);
+	    }
+
+	    prev_port3 = val;
+	}
+	else if (bank == 1)
+	{
+	    if (testbit(val, 0) && !testbit(prev_port5, 0))
+	    {
+		play_sound(4);
+	    }
+
+	    if (testbit(val, 1) && !testbit(prev_port5, 1))
+	    {
+		play_sound(5);
+	    }
+
+	    if (testbit(val, 2) && !testbit(prev_port5, 2))
+	    {
+		play_sound(6);
+	    }
+
+	    if (testbit(val, 3) && !testbit(prev_port5, 3))
+	    {
+		play_sound(7);
+	    }
+
+	    if (testbit(val, 4) && !testbit(prev_port5, 4))
+	    {
+		play_sound(8);
+	    }
+
+	    prev_port5 = val;
+	}
+    }
+
+    void InvadersInterface::play_sound(int id, bool is_playing)
+    {
+	if (invoutput)
+	{
+	    invoutput(id, is_playing);
+	}
+    }
+
+    void InvadersInterface::coin(bool is_pressed)
+    {
+	port1_val = changebit(port1_val, 0, is_pressed);
+    }
+
+    void InvadersInterface::p1start(bool is_pressed)
+    {
+	port1_val = changebit(port1_val, 2, is_pressed);
+    }
+
+    void InvadersInterface::p1left(bool is_pressed)
+    {
+	port1_val = changebit(port1_val, 5, is_pressed);
+    }
+
+    void InvadersInterface::p1right(bool is_pressed)
+    {
+	port1_val = changebit(port1_val, 6, is_pressed);
+    }
+
+    void InvadersInterface::p1fire(bool is_pressed)
+    {
+	port1_val = changebit(port1_val, 4, is_pressed);
     }
 
     void InvadersInterface::updatePixels()
@@ -152,7 +251,17 @@ namespace berrn
 	    this->interrupt_handler();
         };
 
+	auto sound_func = [&](int64_t, int64_t) {
+	    mixSample(getRawSample());
+	    outputAudio();
+	};
+
 	interrupt_timer = new BerrnTimer("Interrupt", scheduler, int_func);
+	sound_timer = new BerrnTimer("Sound", scheduler, sound_func);
+
+	inter.setsoundcallback([&](int id, bool is_playing) -> void {
+	    this->sound_handler(id, is_playing);
+	});
     }
 
     driverinvaders::~driverinvaders()
@@ -165,6 +274,30 @@ namespace berrn
 	uint8_t interrupt_op = (is_end_of_frame) ? 0xD7 : 0xCF;
 	invaders_proc->fire_interrupt(interrupt_op);
 	is_end_of_frame = !is_end_of_frame;
+    }
+
+    void driverinvaders::load_sound(string filename)
+    {
+	sound_IDs.push_back(loadWAV(filename));
+    }
+
+    void driverinvaders::sound_handler(int id, bool is_playing)
+    {
+	auto sound_id = sound_IDs[id];
+
+	if (sound_id == -1)
+	{
+	    return;
+	}
+
+	if (is_playing)
+	{
+	    playSound(sound_id);
+	}
+	else
+	{
+	    stopSound(sound_id);
+	}
     }
 
     string driverinvaders::drivername()
@@ -183,14 +316,27 @@ namespace berrn
 	loadROM("invaders.g", 0x0800, 0x0800, inter.get_gamerom());
 	loadROM("invaders.f", 0x1000, 0x0800, inter.get_gamerom());
 	loadROM("invaders.e", 0x1800, 0x0800, inter.get_gamerom());
+	load_sound("0.wav"); // UFO (repeats)
+	load_sound("1.wav"); // Shot
+	load_sound("2.wav"); // Player explosion
+	load_sound("3.wav"); // Invaders explosion
+	load_sound("4.wav"); // Fleet movement 1
+	load_sound("5.wav"); // Fleet movement 2
+	load_sound("6.wav"); // Fleet movement 3
+	load_sound("7.wav"); // Fleet movement 4
+	load_sound("8.wav"); // UFO hit
+	load_sound("9.wav"); // Extended play
     }
 
     bool driverinvaders::drvinit()
     {
 	loadROMs();
+	setSoundLoop(sound_IDs[0], true);
 	scheduler.reset();
 	scheduler.add_device(invaders_cpu);
-	interrupt_timer->start(((1e6 / 60) / 2), true);
+	// 2 interrupts per frame at 60 hz
+	interrupt_timer->start(time_in_hz(120), true);
+	sound_timer->start(time_in_hz(getSampleRate()), true);
 	resize(224, 256, 2);
 	invaders_proc->init();
 	inter.init();
@@ -201,9 +347,11 @@ namespace berrn
 
     void driverinvaders::drvshutdown()
     {
+	sound_timer->stop();
 	interrupt_timer->stop();
 	inter.shutdown();
 	invaders_proc->shutdown();
+	scheduler.remove_timer(sound_timer);
 	scheduler.remove_timer(interrupt_timer);
 	scheduler.remove_device(invaders_cpu);
     }
@@ -225,6 +373,34 @@ namespace berrn
 
     void driverinvaders::keychanged(BerrnInput key, bool is_pressed)
     {
-	return;
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		inter.coin(is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		inter.p1start(is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		inter.p1left(is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		inter.p1right(is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnFireP1:
+	    {
+		inter.p1fire(is_pressed);
+	    }
+	    break;
+	    default: break;
+	}
     }
 };

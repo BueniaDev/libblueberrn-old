@@ -160,8 +160,7 @@ namespace berrn
 	}
 	else if (addr < 0x6800)
 	{
-	    // TODO: IN0 reads
-	    data = 0x00;
+	    data = port0_val;
 	}
 	else if (addr < 0x7000)
 	{
@@ -250,6 +249,11 @@ namespace berrn
 	    auto obj_dst = &sprite_data[(i * 256)];
 	    decode_sprite(obj_src, obj_dst);
 	}
+    }
+
+    void GalaxianInterface::coin(bool is_pressed)
+    {
+	port0_val = changebit(port0_val, 0, is_pressed);
     }
 
     void GalaxianInterface::star_scroll_callback()
@@ -372,6 +376,7 @@ namespace berrn
 	    int posy = (ypos + py);
 	    int posx = (xpos + px);
 	    uint8_t color = palette.at(tile_color);
+
 	    set_pixel(posx, posy, color);
 	}
     }
@@ -507,7 +512,7 @@ namespace berrn
 
 	    if (!inRange(xpos, -16, width))
 	    {
-		return;
+		continue;
 	    }
 
 	    uint8_t sprite_num = (flip_attrib & 0x3F);
@@ -613,8 +618,44 @@ namespace berrn
 	filltexrect(0, 0, 224, 256, inter.get_framebuffer());
     }
 
+    float drivergalaxian::get_framerate()
+    {
+	return (16000.0 / 132.0 / 2.0); // Framerate is 60.606060 Hz
+    }
+
     void drivergalaxian::keychanged(BerrnInput key, bool is_pressed)
     {
-	return;
+	string key_state = (is_pressed) ? "pressed" : "released";
+
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		cout << "Coin button has been " << key_state << endl;
+		inter.coin(is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		cout << "P1 start button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		cout << "P1 left button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		cout << "P1 right button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnFireP1:
+	    {
+		cout << "P1 fire button has been " << key_state << endl;
+	    }
+	    break;
+	    default: break;
+	}
     }
 };

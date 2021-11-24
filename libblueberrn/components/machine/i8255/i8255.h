@@ -40,39 +40,42 @@ namespace i8255
 
 	    }
 
+	    void init()
+	    {
+		set_mode(0x9B);
+		cout << "I8255::Initialized" << endl;
+	    }
+
+	    void shutdown()
+	    {
+		cout << "I8255::Shutting down..." << endl;
+	    }
+
 	    void write(int addr, uint8_t data)
 	    {
-		switch (addr & 0x3)
+		switch ((addr & 0x3))
 		{
-		    case 0:
-		    {
-			cout << "Writing value of " << hex << int(data) << " to I8255 port A" << endl;
-		    }
-		    break;
-		    case 1:
-		    {
-			cout << "Writing value of " << hex << int(data) << " to I8255 port B" << endl;
-		    }
-		    break;
-		    case 2:
-		    {
-			cout << "Writing value of " << hex << int(data) << " to I8255 port C" << endl;
-		    }
-		    break;
+		    case 1: write_port_b(data); break;
 		    case 3:
 		    {
 			if (testbit(data, 7))
 			{
-			    cout << "Setting I8255 control word to " << hex << int(data) << endl;
+			    set_mode(data);
 			}
 			else
 			{
-			    int bit = ((data >> 1) & 0x7);
-			    bool is_set = testbit(data, 0);
-
-			    string bit_status = (is_set) ? "Setting" : "Resetting";
-			    cout << bit_status << " bit " << dec << bit << " of I8255 port C" << endl;
+			    int bit_to_change = ((data >> 1) & 0x7);
+			    bool state = testbit(data, 0);
+			    string port_state = (state ? "Setting" : "Resetting");
+			    cout << port_state << " bit " << dec << bit_to_change << " of I8255 port C" << endl;
+			    exit(0);
 			}
+		    }
+		    break;
+		    default:
+		    {
+			cout << "Writing value of " << hex << int(data) << " to I8255 address of " << dec << int((addr & 0x3)) << endl;
+			exit(0);
 		    }
 		    break;
 		}
@@ -84,6 +87,56 @@ namespace i8255
 	    {
 		return ((reg >> bit) & 1) ? true : false;
 	    }
+
+	    void set_mode(uint8_t data)
+	    {
+		control_reg = data;
+
+		cout << "I8255 Group A mode: " << dec << int((control_reg >> 5) & 0x3) << endl;
+		cout << "I8255 Port A mode: " << (testbit(control_reg, 4) ? "Input" : "Output") << endl;
+		cout << "I8255 Port C upper mode: " << (testbit(control_reg, 3) ? "Input" : "Output") << endl;
+		cout << "I8255 Group B mode: " << dec << int(testbit(control_reg, 2)) << endl;
+		cout << "I8255 Port B mode: " << (testbit(control_reg, 1) ? "Input" : "Output") << endl;
+		cout << "I8255 Port C lower mode: " << (testbit(control_reg, 0) ? "Input" : "Output") << endl;
+		cout << endl;
+
+		group_b_mode = testbit(control_reg, 2) ? 1 : 0;
+		is_port_b_input = testbit(control_reg, 1);
+
+		outputs[0] = 0;
+		outputs[1] = 0;
+		outputs[2] = 0;
+	    }
+
+	    void write_port_b(uint8_t data)
+	    {
+		switch (group_b_mode)
+		{
+		    case 0:
+		    {
+			if (!is_port_b_input)
+			{
+			    outputs[1] = data;
+
+			    // TODO: Implement I8255 callback functions
+			    cout << "Writing value of " << hex << int(data) << " to I8255 port B" << endl;
+			}
+		    }
+		    break;
+		    default:
+		    {
+			cout << "Unrecognized group B mode of " << dec << int(group_b_mode) << endl;
+			exit(0);
+		    }
+		    break;
+		}
+	    }
+
+	    uint8_t control_reg = 0;
+	    int group_b_mode = 0;
+	    bool is_port_b_input = false;
+
+	    array<uint8_t, 3> outputs;
     };
 };
 

@@ -7,6 +7,7 @@
 #include <vector>
 #include <array>
 #include <bitset>
+#include <scheduler.h>
 #include <libblueberrn_api.h>
 using namespace std;
 
@@ -158,9 +159,12 @@ namespace berrn
 	    virtual vector<uint8_t> readfile(string filename) = 0;
 	    virtual vector<uint8_t> readfilefromzip(string filename) = 0;
 	    virtual void closezip() = 0;
+	    virtual int getSampleRate() = 0;
 	    virtual int loadWAV(string filename) = 0;
 	    virtual bool hasSounds() = 0;
+	    virtual bool setSoundLoop(int id, bool is_loop) = 0;
 	    virtual bool playSound(int id) = 0;
+	    virtual bool stopSound(int id) = 0;
 	    virtual bool setSoundVol(int id, double vol) = 0;
 	    virtual array<int16_t, 2> getMixedSamples() = 0;
 	    virtual void freeSounds() = 0;
@@ -238,6 +242,8 @@ namespace berrn
 	BerrnStartP1,
 	BerrnLeftP1,
 	BerrnRightP1,
+	BerrnUpP1,
+	BerrnDownP1,
 	BerrnFireP1,
     };
 
@@ -257,6 +263,7 @@ namespace berrn
 	    bool startdriver()
 	    {
 		cout << "Driver started" << endl;
+		final_samples.fill(0);
 		return drvinit();
 	    }
 
@@ -312,6 +319,16 @@ namespace berrn
 		}
 	    }
 
+	    bool setSoundLoop(int id, bool is_loop)
+	    {
+		if (front == NULL)
+		{
+		    return false;
+		}
+
+		return front->setSoundLoop(id, is_loop);
+	    }
+
 	    int loadWAV(string filename)
 	    {
 		return loadSoundWAV(filename);
@@ -337,20 +354,64 @@ namespace berrn
 		return front->playSound(id);
 	    }
 
-	    void outputSamples()
+	    bool stopSound(int id)
+	    {
+		if (front == NULL)
+		{
+		    return false;
+		}
+
+		return front->stopSound(id);
+	    }
+
+	    int getSampleRate()
+	    {
+		if (front == NULL)
+		{
+		    return 0;
+		}
+
+		return front->getSampleRate();
+	    }
+
+	    array<int16_t, 2> getRawSample()
+	    {
+		if (front == NULL)
+		{
+		    return {0, 0};
+		}
+
+		if (!front->hasSounds())
+		{
+		    return {0, 0};
+		}
+
+		return front->getMixedSamples();
+	    }
+
+	    void mixSample(array<int16_t, 2> samples)
+	    {
+		int32_t current_left = final_samples[0];
+		int32_t current_right = final_samples[1];
+
+		int32_t new_left = samples[0];
+		int32_t new_right = samples[1];
+
+		int32_t mixed_left = (current_left + new_left);
+		int32_t mixed_right = (current_right + new_right);
+
+		final_samples = {int16_t(mixed_left), int16_t(mixed_right)};
+	    }
+
+	    void outputAudio()
 	    {
 		if (front == NULL)
 		{
 		    return;
 		}
 
-		if (!front->hasSounds())
-		{
-		    return;
-		}
-
-		// array<int16_t, 2> samples = front->getMixedSamples();
-		// front->audioCallback(samples);
+		front->audioCallback(final_samples);
+		final_samples.fill(0);
 	    }
 
 	    void drawpixels()
@@ -372,6 +433,10 @@ namespace berrn
 
 	    void closedriver()
 	    {
+		closeSounds();
+		is_samples_dir = false;
+		is_samples_dir_exists = false;
+
 		if (!hasdriverROMs())
 		{
 		    return;
@@ -380,8 +445,6 @@ namespace berrn
 		closefiles();
 		is_dir_check = false;
 		is_dir_exists = false;
-		is_samples_dir = false;
-		is_samples_dir_exists = false;
 	    }
 
 	    virtual void keychanged(BerrnInput key, bool is_pressed) = 0;
@@ -396,6 +459,11 @@ namespace berrn
 	    virtual bool drvinit() = 0;
 	    virtual void drvshutdown() = 0;
 	    virtual void drvrun() = 0;
+
+	    virtual float get_framerate()
+	    {
+		return 60;
+	    }
       
 	    BlueberrnVideo *video = NULL;
 	    BlueberrnFrontend *front = NULL;
@@ -412,6 +480,8 @@ namespace berrn
 	    string romspath = "";
 
 	    string samplespath = "";
+
+	    array<int16_t, 2> final_samples = {0, 0};
 
 	    int loadSoundWAV(string filename)
 	    {
@@ -501,7 +571,7 @@ namespace berrn
 		return filetemp;
 	    }
 
-	    void closefiles()
+	    void closeSounds()
 	    {
 		if (front == NULL)
 		{
@@ -511,6 +581,14 @@ namespace berrn
 		if (front->hasSounds())
 		{
 		    front->freeSounds();
+		}
+	    }
+
+	    void closefiles()
+	    {
+		if (front == NULL)
+		{
+		    return;
 		}
 
 		if (is_zip_loaded)

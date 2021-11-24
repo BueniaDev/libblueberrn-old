@@ -33,6 +33,8 @@ using namespace std;
 
 namespace berrn
 {
+    using invoutputfunc = function<void(int, bool)>;
+
     class LIBBLUEBERRN_API InvadersInterface : public BerrnInterface
     {
 	public:
@@ -48,6 +50,11 @@ namespace berrn
 	    void portOut(uint16_t port, uint8_t val);
 	    void updatePixels();
 
+	    void setsoundcallback(invoutputfunc cb)
+	    {
+		invoutput = cb;
+	    }
+
 	    vector<uint8_t> &get_gamerom()
 	    {
 		return gamerom;
@@ -58,10 +65,25 @@ namespace berrn
 		return framebuffer;
 	    }
 
+	    void coin(bool is_pressed);
+	    void p1start(bool is_pressed);
+	    void p1left(bool is_pressed);
+	    void p1right(bool is_pressed);
+	    void p1fire(bool is_pressed);
+
 	private:
 	    vector<uint8_t> gamerom;
 	    vector<uint8_t> workram;
 	    vector<uint8_t> videoram;
+
+	    invoutputfunc invoutput;
+
+	    uint8_t prev_port3 = 0;
+	    uint8_t prev_port5 = 0;
+
+	    void write_sound_port(int bank, uint8_t val);
+
+	    void play_sound(int id, bool is_playing = true);
 
 	    void debugPort(uint8_t val);
 
@@ -73,6 +95,8 @@ namespace berrn
 
 	    const size_t width = 224;
 	    const size_t height = 256;
+
+	    array<int, 9> sounds;
     };
 
     class LIBBLUEBERRN_API driverinvaders : public berrndriver
@@ -93,18 +117,19 @@ namespace berrn
 
 	    void interrupt_handler();
 
-	    void loadInvSound(string filename);
-	    void playInvSound(int id);
-
 	private:
-	    vector<int> soundIDs;
+	    vector<int> sound_IDs;
 
 	    InvadersInterface inter;
 	    BerrnScheduler scheduler;
 
+	    void sound_handler(int id, bool is_playing);
+	    void load_sound(string filename);
+
 	    Berrn8080Processor *invaders_proc = NULL;
 	    BerrnCPU *invaders_cpu = NULL;
 	    BerrnTimer *interrupt_timer = NULL;
+	    BerrnTimer *sound_timer = NULL;
 
 	    bool is_end_of_frame = false;
     };

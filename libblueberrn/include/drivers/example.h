@@ -42,6 +42,9 @@ namespace berrn
 	    void drvrun();
 
 	    void keychanged(BerrnInput key, bool is_pressed);
+
+	private:
+	    int sample_val = 0;
     };
 };
 

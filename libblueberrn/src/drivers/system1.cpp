@@ -49,6 +49,7 @@ namespace berrn
     void Sys1MainInterface::init()
     {
 	vram.fill(0);
+	pram.fill(0);
 	mainram.fill(0);
     }
 
@@ -72,9 +73,13 @@ namespace berrn
 	{
 	    mainram[(addr & 0xFFF)] = data;
 	}
+	else if (addr < 0xD800)
+	{
+	    oam[(addr & 0x7FF)] = data;
+	}
 	else if (addr < 0xE000)
 	{
-	    BerrnInterface::writeCPU8(addr, data);
+	    pram[(addr & 0x7FF)] = data;
 	}
 	else if (addr < 0xF000)
 	{
@@ -89,6 +94,22 @@ namespace berrn
     uint8_t Sys1MainInterface::readOp8(uint16_t addr)
     {
 	return readByte(addr);
+    }
+
+    uint8_t Sys1MainInterface::portIn(uint16_t port)
+    {
+	uint8_t temp = 0x00;
+
+	if (inputcb)
+	{
+	    temp = inputcb((port & 0x1F));
+	}
+	else
+	{
+	    temp = BerrnInterface::portIn(port);
+	}
+
+	return temp;
     }
 
     void Sys1MainInterface::portOut(uint16_t port, uint8_t data)
@@ -108,8 +129,7 @@ namespace berrn
 	}
 	else if (addr < 0xC000)
 	{
-	    cout << "Reading byte from address of " << hex << int(addr) << endl;
-	    exit(0);
+	    data = gamerom.at(addr);
 	}
 	else if (addr < 0xD000)
 	{
@@ -141,6 +161,10 @@ namespace berrn
 	main_proc = new BerrnZ80Processor(20000000, main_inter);
 	main_proc->set_prescalers(5, 2); // See notes for details
 	main_cpu = new BerrnCPU(scheduler, *main_proc);
+
+	interrupt_timer = new BerrnTimer("IRQMain", scheduler, [&](int64_t, int64_t) {
+	    interruptHandler(0);
+	});
     }
 
     SegaSys1PPI::~SegaSys1PPI()
@@ -153,14 +177,33 @@ namespace berrn
 	scheduler.reset();
 	scheduler.add_device(main_cpu);
 	main_proc->init();
-	auto outputfunc = bind(&SegaSys1PPI::writeOutput, this, _1, _2);
-	main_inter.setoutputcallback(outputfunc);
+
+	main_inter.setinputcallback([&](int addr) -> uint8_t {
+	    return readInput(addr);
+	});
+
+	main_inter.setoutputcallback([&](int addr, uint8_t data) -> void {
+	    writeOutput(addr, data);
+	});
+
 	main_inter.init();
+	main_ppi.init();
+
+	interrupt_timer->start(time_in_hz(60), true);
 	return;
+    }
+
+    void SegaSys1PPI::interruptHandler(int param)
+    {
+	if (param == 0)
+	{
+	    main_proc->fire_interrupt8(0xFF); // RST 38H
+	}
     }
 
     void SegaSys1PPI::shutdown()
     {
+	main_ppi.shutdown();
 	main_inter.shutdown();
 	main_proc->shutdown();
 	scheduler.remove_device(main_cpu);
@@ -178,11 +221,67 @@ namespace berrn
 	}
     }
 
+    uint8_t SegaSys1PPI::readInput(int addr)
+    {
+	uint8_t temp = 0;
+
+	switch (addr)
+	{
+	    case 0x00:
+	    {
+		// TODO: Implement P1 reads
+		cout << "Reading P1..." << endl;
+		temp = 0xFF;
+	    }
+	    break;
+	    case 0x04:
+	    {
+		// TODO: Implement P2 reads
+		cout << "Reading P2..." << endl;
+		temp = 0xFF;
+	    }
+	    break;
+	    case 0x08:
+	    {
+		// TODO: Implement SYSTEM reads
+		cout << "Reading SYSTEM..." << endl;
+		temp = 0xFF;
+	    }
+	    break;
+	    case 0x0C:
+	    {
+		// TODO: Implement SWA reads
+		cout << "Reading SWA..." << endl;
+		temp = 0x00;
+	    }
+	    break;
+	    case 0x10:
+	    {
+		// TODO: Implement SWB reads
+		cout << "Reading SWB..." << endl;
+		temp = 0x00;
+	    }
+	    break;
+	    default:
+	    {
+		cout << "Reading from System 1 PPI port of " << hex << int(addr) << endl;
+		exit(0);
+	    }
+	    break;
+	}
+
+	return temp;
+    }
+
     void SegaSys1PPI::writeOutput(int addr, uint8_t data)
     {
-	if ((addr >= 0x14) && (addr <= 0x17))
+	switch (addr)
 	{
-	    main_ppi.write((addr & 0x3), data);
+	    case 0x14: main_ppi.write(0, data); break;
+	    case 0x15: main_ppi.write(1, data); break;
+	    case 0x16: main_ppi.write(2, data); break;
+	    case 0x17: main_ppi.write(3, data); break;
+	    default: break;
 	}
     }
 

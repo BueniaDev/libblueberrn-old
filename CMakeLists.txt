@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(BUILD_EXAMPLE "Enables the example renderer (requires SDL2)." OFF)
+option(BUILD_SDL2 "Enables the command-line frontend (requires SDL2)." OFF)
 
 set(LIBBLUEBERRN_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/include")
 
@@ -14,8 +14,8 @@ include_directories(AFTER PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/compo
 include_directories(AFTER PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/include/libblueberrn")
 include_directories(AFTER PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/include/drivers")
 
-if (BUILD_EXAMPLE STREQUAL "ON")
-	add_subdirectory(example/sdl2)
+if (BUILD_SDL2 STREQUAL "ON")
+	add_subdirectory(blueberrn-SDL)
 endif()
 
 add_subdirectory(libblueberrn)

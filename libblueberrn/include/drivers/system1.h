@@ -32,6 +32,7 @@ using namespace std::placeholders;
 
 namespace berrn
 {
+    using sys1inputfunc = function<uint8_t(int)>;
     using sys1outputfunc = function<void(int, uint8_t)>;
     // Interface for the main CPU
     class LIBBLUEBERRN_API Sys1MainInterface : public BerrnInterface
@@ -46,11 +47,17 @@ namespace berrn
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
 	    uint8_t readOp8(uint16_t addr);
+	    uint8_t portIn(uint16_t port);
 	    void portOut(uint16_t port, uint8_t data);
 
 	    vector<uint8_t> &get_gamerom()
 	    {
 		return gamerom;
+	    }
+
+	    void setinputcallback(sys1inputfunc cb)
+	    {
+		inputcb = cb;
 	    }
 
 	    void setoutputcallback(sys1outputfunc cb)
@@ -64,7 +71,10 @@ namespace berrn
 	    vector<uint8_t> gamerom;
 	    array<uint8_t, 0x1000> mainram;
 	    array<uint8_t, 0x1000> vram;
+	    array<uint8_t, 0x800> pram;
+	    array<uint8_t, 0x800> oam;
 
+	    sys1inputfunc inputcb;
 	    sys1outputfunc outputcb;
     };
 
@@ -88,12 +98,16 @@ namespace berrn
 	    Sys1MainInterface main_inter;
 	    BerrnScheduler scheduler;
 
+	    BerrnTimer *interrupt_timer = NULL;
+
 	    // array<berrnRGBA, (512 * 224)> framebuffer;
 
 	    BerrnZ80Processor *main_proc = NULL;
 	    BerrnCPU *main_cpu = NULL;
 
+	    uint8_t readInput(int addr);
 	    void writeOutput(int addr, uint8_t data);
+	    void interruptHandler(int param);
 
 	    i8255ppi main_ppi;
     };

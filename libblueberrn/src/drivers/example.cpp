@@ -43,6 +43,14 @@ namespace berrn
 
     bool driverexample::drvinit()
     {
+	sample_val = loadWAV("loop.wav");
+
+	if (sample_val != -1)
+	{
+	    setSoundLoop(sample_val, true);
+	    playSound(sample_val);
+	}
+
 	resize(640, 480, 1);
 	return true;
     }
@@ -56,10 +64,56 @@ namespace berrn
     {
 	fillrect(0, 0, 640, 480, red());
 	fillrect(50, 50, 100, 100, green());
+
+	for (int i = 0; i < (getSampleRate() / 60); i++)
+	{
+	    mixSample(getRawSample());
+	    outputAudio();
+	}
     }
 
     void driverexample::keychanged(BerrnInput key, bool is_pressed)
     {
-	return;
+	string key_state = (is_pressed) ? "pressed" : "released";
+
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		cout << "Coin button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		cout << "P1 start button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		cout << "P1 left button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		cout << "P1 right button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnUpP1:
+	    {
+		cout << "P1 up button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnDownP1:
+	    {
+		cout << "P1 down button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnFireP1:
+	    {
+		cout << "P1 fire button has been " << key_state << endl;
+	    }
+	    break;
+	    default: break;
+	}
     }
 };

@@ -1,0 +1,3 @@
+set(WSG3_HEADERS
+	"wsg3.h"
+	PARENT_SCOPE)

@@ -5,16 +5,19 @@
 #endif
 #include <imgui.h>
 #include <imgui_sdl.h>
+#include <cmixer.h>
 #include <zip.h>
 #include <toml.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <functional>
+#include <ctime>
 #include <filesystem>
 #include <queue>
 #include <libblueberrn/libblueberrn.h>
 #include "sdl2logo.h" // Splash screen bitmap as C-array
+#include "sdl2logoxmas.h" // Splash screen bitmap as C-array (holiday version)
 namespace fs = std::filesystem;
 using namespace berrn;
 using namespace std;
@@ -82,6 +85,7 @@ class SDL2Frontend : public BlueberrnFrontend
 				
 	bool init()
 	{
+	    is_xmas_time = is_xmas();
 	    init_config_file();
 
 	    isdriverloaded = !core->nocmdarguments();
@@ -116,10 +120,21 @@ class SDL2Frontend : public BlueberrnFrontend
 		return sdl_error("Could not open audio!");
 	    }
 
-	    // SDL_PauseAudio(!isdriverloaded);
+	    cm_init(audiospec.freq);
+	    cm_set_master_gain(0.5);
 
-	    surface = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);				
-	    cout << "Welcome to blueberrn-SDL." << endl;
+	    SDL_PauseAudio(!isdriverloaded);
+
+	    surface = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);
+
+	    if (is_xmas_time)
+	    {
+		cout << "Happy holidays from blueberrn-SDL!" << endl;
+	    }
+	    else
+	    {
+		cout << "Welcome to blueberrn-SDL." << endl;
+	    }
 
 	    initbasepath();
 			
@@ -134,7 +149,16 @@ class SDL2Frontend : public BlueberrnFrontend
 				
 	void initsplash()
 	{
-	    SDL_Surface *image = loadbmp(sdl2logo, sdl2logo_len);		
+	    SDL_Surface *image = NULL;
+
+	    if (is_xmas_time)
+	    {
+		image = loadbmp(sdl2logoxmas, sdl2logoxmas_len);
+	    }
+	    else
+	    {
+		image = loadbmp(sdl2logo, sdl2logo_len);
+	    }	
 	    optsurface = SDL_ConvertSurface(image, surface->format, 0);
 	    SDL_FreeSurface(image);
 						
@@ -150,13 +174,22 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	    ImGuiIO &io = ImGui::GetIO();
 
-	    io.Fonts->AddFontFromFileTTF("NotoSans-Regular.ttf", 21.0f, NULL, io.Fonts->GetGlyphRangesDefault());
+	    stringstream base_font_en;
+	    base_font_en << basePath << pathSeparator << "fonts" << pathSeparator << "NotoSans-Regular.ttf";
+
+	    stringstream base_font_jp;
+	    base_font_jp << basePath << pathSeparator << "fonts" << pathSeparator << "NotoSansJP-Regular.otf";
+
+	    stringstream base_font_kr;
+	    base_font_kr << basePath << pathSeparator << "fonts" << pathSeparator << "NotoSansKR-Regular.otf";
+
+	    io.Fonts->AddFontFromFileTTF(base_font_en.str().c_str(), 21.0f, NULL, io.Fonts->GetGlyphRangesDefault());
 
 	    ImFontConfig config;
 	    config.MergeMode = true;
 
-	    io.Fonts->AddFontFromFileTTF("NotoSansJP-Regular.otf", 21.0f, &config, io.Fonts->GetGlyphRangesJapanese());
-	    io.Fonts->AddFontFromFileTTF("NotoSansKR-Regular.otf", 21.0f, &config, io.Fonts->GetGlyphRangesKorean());
+	    io.Fonts->AddFontFromFileTTF(base_font_jp.str().c_str(), 21.0f, &config, io.Fonts->GetGlyphRangesJapanese());
+	    io.Fonts->AddFontFromFileTTF(base_font_kr.str().c_str(), 21.0f, &config, io.Fonts->GetGlyphRangesKorean());
 	    io.Fonts->Build();
 
 	    ImGuiSDL::Initialize(render, width, height);
@@ -201,7 +234,7 @@ class SDL2Frontend : public BlueberrnFrontend
 			core->startdriver();
 			driverselbox = false;
 			isdriverloaded = true;
-			// SDL_PauseAudio(0);
+			SDL_PauseAudio(0);
 		    }
 		}
 	    }
@@ -236,7 +269,8 @@ class SDL2Frontend : public BlueberrnFrontend
 			if (isdriverloaded)
 			{
 			    core->stopdriver();
-			    // SDL_PauseAudio(1);
+			    SDL_ClearQueuedAudio(1);
+			    SDL_PauseAudio(1);
 			    resize(startwidth, startheight, 1);
 			    initsplash();
 			    isdriverloaded = false;
@@ -316,6 +350,8 @@ class SDL2Frontend : public BlueberrnFrontend
 			    case SDLK_RETURN: core->keychanged(BerrnInput::BerrnStartP1, is_pressed); break;
 			    case SDLK_LEFT: core->keychanged(BerrnInput::BerrnLeftP1, is_pressed); break;
 			    case SDLK_RIGHT: core->keychanged(BerrnInput::BerrnRightP1, is_pressed); break;
+			    case SDLK_UP: core->keychanged(BerrnInput::BerrnUpP1, is_pressed); break;
+			    case SDLK_DOWN: core->keychanged(BerrnInput::BerrnDownP1, is_pressed); break;
 			    case SDLK_a: core->keychanged(BerrnInput::BerrnFireP1, is_pressed); break;
 			}
 		    }
@@ -511,23 +547,44 @@ class SDL2Frontend : public BlueberrnFrontend
 	    }
 	}
 
-	// Audio code (using placeholder code for now)
-	// TODO: Properly implement audio logic
+	// Audio logic (samples logic powered by cmixer)
+	// TODO: Make overall audio API more robust
+	int getSampleRate()
+	{
+	    return 48000;
+	}
 
 	int loadWAV(string filename)
 	{
-	    cout << "Loading WAV with filename of " << filename << endl;
 	    int id = samplesounds.size();
 
-	    cout << "Sound " << dec << id << " succesfully loaded." << endl;
+	    cm_Source *src = cm_new_source_from_file(filename.c_str());
 
-	    samplesounds.push_back(0);
+	    if (src == NULL)
+	    {
+		cout << "Could not load " << filename << "! cm_error: " << cm_get_error() << endl;
+		return -1;
+	    }
+
+	    samplesounds.push_back(src);
 	    return id;
 	}
 
 	bool hasSounds()
 	{
 	    return !samplesounds.empty();
+	}
+
+	bool setSoundLoop(int id, bool is_loop)
+	{
+	    if ((id < 0) || (id >= static_cast<int>(samplesounds.size())))
+	    {
+		return false;
+	    }
+
+	    int loop_val = (is_loop) ? 1 : 0;
+	    cm_set_loop(samplesounds[id], loop_val);
+	    return true;
 	}
 
 	bool playSound(int id)
@@ -537,7 +594,18 @@ class SDL2Frontend : public BlueberrnFrontend
 		return false;
 	    }
 
-	    cout << "Playing sound of " << dec << id << endl;
+	    cm_play(samplesounds[id]);
+	    return true;
+	}
+
+	bool stopSound(int id)
+	{
+	    if ((id < 0) || (id >= static_cast<int>(samplesounds.size())))
+	    {
+		return false;
+	    }
+
+	    cm_stop(samplesounds[id]);
 	    return true;
 	}
 
@@ -553,21 +621,31 @@ class SDL2Frontend : public BlueberrnFrontend
 		return false;
 	    }
 
-	    cout << "Setting gain of sound " << dec << (int)id << " to " << vol << endl;
+	    cm_set_gain(samplesounds[id], vol);
 	    return true;
 	}
 
 	array<int16_t, 2> getMixedSamples()
 	{
 	    array<int16_t, 2> samples;
-	    samples[0] = 0;
-	    samples[1] = 0;
+	    cm_Int16 dst[2];
+	    cm_process(dst, 2);
+	    samples[0] = dst[0];
+	    samples[1] = dst[1];
 	    return samples;
 	}
 
 	void freeSounds()
 	{
-	    cout << "Clearing " << dec << (int)samplesounds.size() << " sounds..." << endl;
+	    for (int id = 0; id < samplesounds.size(); id++)
+	    {
+		if (samplesounds[id] != NULL)
+		{
+		    cm_destroy_source(samplesounds[id]);
+		    samplesounds[id] = NULL;
+		}
+	    }
+
 	    samplesounds.clear();
 	}
 
@@ -575,9 +653,21 @@ class SDL2Frontend : public BlueberrnFrontend
 	{
 	    int16_t left = samples[0];
 	    int16_t right = samples[1];
-	    cout << "Left sample: " << dec << (int)left << endl;
-	    cout << "Right sample: " << dec << (int)right << endl;
-	    cout << endl;
+
+	    audiobuffer.push_back(left);
+	    audiobuffer.push_back(right);
+
+	    if (audiobuffer.size() >= 4096)
+	    {
+		audiobuffer.clear();
+
+		while (SDL_GetQueuedAudioSize(1) > (4096 * sizeof(int16_t)))
+		{
+		    SDL_Delay(1);
+		}
+
+		SDL_QueueAudio(1, audiobuffer.data(), (4096 * sizeof(int16_t)));
+	    }
 	}
 		
 	SDL_Window *window = NULL;
@@ -618,12 +708,24 @@ class SDL2Frontend : public BlueberrnFrontend
 		
 	queue<SDL2Tex> maintex;
 
-	vector<int> samplesounds;
+	vector<cm_Source*> samplesounds;
+
+	vector<int16_t> audiobuffer;
 
 	string basePath = "";
 	string pathSeparator = "";
 
 	toml::Value toml_val;
+
+	bool is_xmas_time = false;
+
+	bool is_xmas()
+	{
+	    time_t t = time(NULL);
+	    tm* timeptr = localtime(&t);
+
+	    return (timeptr->tm_mon == 11);
+	}
 };
 
 BlueberrnCore core;

@@ -70,6 +70,8 @@ namespace berrn
 		return is_irq_enabled;
 	    }
 
+	    void coin(bool is_pressed);
+
 	private:
 	    vector<uint8_t> char_data;
 	    vector<uint8_t> sprite_data;
@@ -120,6 +122,8 @@ namespace berrn
 
 	    const int width = 224;
 	    const int height = 256;
+
+	    uint8_t port0_val = 0;
     };
 
     class LIBBLUEBERRN_API drivergalaxian : public berrndriver
@@ -136,6 +140,8 @@ namespace berrn
 	    bool drvinit();
 	    void drvshutdown();
 	    void drvrun();
+
+	    float get_framerate();
 
 	    void keychanged(BerrnInput key, bool is_pressed);
 
