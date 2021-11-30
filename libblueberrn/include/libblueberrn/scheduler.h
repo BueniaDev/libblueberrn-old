@@ -32,7 +32,7 @@ namespace berrn
     {
 	public:
 	    virtual void reset() = 0;
-	    virtual int64_t get_exec_time() const = 0;
+	    virtual int64_t get_exec_time() = 0;
 	    virtual int64_t execute(int64_t until_time) = 0; // usecs
 	    virtual void stop_timeslice() = 0;
     };
@@ -50,9 +50,10 @@ namespace berrn
 		return;
 	    }
 
-	    virtual void fire_interrupt8(uint8_t opcode)
+	    virtual void fire_interrupt8(uint8_t opcode, bool is_line = true)
 	    {
 		(void)opcode;
+		(void)is_line;
 		return;
 	    }
 
@@ -71,7 +72,7 @@ namespace berrn
 		return;
 	    }
 
-	    virtual int64_t get_exec_time() const
+	    virtual int64_t get_exec_time()
 	    {
 		return 0;
 	    }
@@ -232,7 +233,7 @@ namespace berrn
 		current_time = static_cast<uint64_t>(until_time);
 	    }
 
-	    int64_t get_current_time() const
+	    int64_t get_current_time()
 	    {
 		int64_t result = current_time;
 
@@ -352,7 +353,7 @@ namespace berrn
 		processor.reset();
 	    }
 
-	    virtual int64_t get_exec_time() const
+	    virtual int64_t get_exec_time()
 	    {
 		return processor.get_exec_time();
 	    }

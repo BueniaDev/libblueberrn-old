@@ -155,7 +155,6 @@ class BerrnZ80Processor : public BerrnProcessor
 	int64_t current_cycles = 0;
 	int64_t cycles_left = 0;
 	bool is_stopped = true;
-	bool dump = false;
 };
 
 #endif // LIBBLUEBERRN_Z80_H

@@ -336,6 +336,46 @@ namespace berrn
 
     void driverwboy2u::keychanged(BerrnInput key, bool is_pressed)
     {
-	return;
+	string key_state = (is_pressed) ? "pressed" : "released";
+
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		cout << "Coin button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		cout << "P1 start button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		cout << "P1 left button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		cout << "P1 right button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnUpP1:
+	    {
+		cout << "P1 up button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnDownP1:
+	    {
+		cout << "P1 down button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnFireP1:
+	    {
+		cout << "P1 fire button has been " << key_state << endl;
+	    }
+	    break;
+	    default: break;
+	}
     }
 };

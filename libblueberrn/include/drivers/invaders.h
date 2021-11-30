@@ -95,8 +95,6 @@ namespace berrn
 
 	    const size_t width = 224;
 	    const size_t height = 256;
-
-	    array<int, 9> sounds;
     };
 
     class LIBBLUEBERRN_API driverinvaders : public berrndriver

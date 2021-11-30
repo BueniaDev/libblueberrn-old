@@ -216,10 +216,10 @@ namespace berrn
 
     void InvadersInterface::updatePixels()
     {
-	for (int i = 0; i < ((256 * 224) / 8); i++)
+	for (size_t i = 0; i < ((width * height) / 8); i++)
 	{
-	    int y = ((i * 8) / 256);
-	    int basex = ((i * 8) % 256);
+	    int y = ((i * 8) / width);
+	    int basex = ((i * 8) % width);
 
 	    uint8_t current_byte = videoram.at(i);
 
