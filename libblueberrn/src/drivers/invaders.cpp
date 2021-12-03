@@ -218,8 +218,8 @@ namespace berrn
     {
 	for (size_t i = 0; i < ((width * height) / 8); i++)
 	{
-	    int y = ((i * 8) / width);
-	    int basex = ((i * 8) % width);
+	    int y = ((i * 8) / height);
+	    int basex = ((i * 8) % height);
 
 	    uint8_t current_byte = videoram.at(i);
 
