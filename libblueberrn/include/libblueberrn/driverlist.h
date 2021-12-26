@@ -17,7 +17,9 @@ namespace berrn
 	    DRIVER(invaders);
 	    DRIVER(galaxian);
 	    DRIVER(pacman);
+	    DRIVER(galaga);
 	    DRIVER(wboy2u);
+	    DRIVER(rastan);
 	}
     };
 };

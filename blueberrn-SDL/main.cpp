@@ -101,7 +101,7 @@ class SDL2Frontend : public BlueberrnFrontend
 		return sdl_error("Window could not be created!");
 	    }
 						
-	    render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	    render = SDL_CreateRenderer(window, -1, 0);
 				
 	    if (render == NULL)
 	    {
@@ -215,6 +215,7 @@ class SDL2Frontend : public BlueberrnFrontend
 		ImGuiIO &io = ImGui::GetIO();
 		pollevents(io);
 		runmachine();
+		limitframerate();
 	    }
 	}
 				
@@ -230,11 +231,21 @@ class SDL2Frontend : public BlueberrnFrontend
 		{
 		    if (!isdriverloaded)
 		    {
-			core->initdriver(name);
-			core->startdriver();
 			driverselbox = false;
-			isdriverloaded = true;
-			SDL_PauseAudio(0);
+			core->initdriver(name);
+			if (core->startdriver())
+			{
+			    isdriverloaded = true;
+			    SDL_PauseAudio(0);
+			}
+			else
+			{
+			    cout << "Error: could not start driver " << name << endl;
+			    SDL_PauseAudio(1);
+			    resize(startwidth, startheight, 1);
+			    initsplash();
+			    isdriverloaded = false;
+			}
 		    }
 		}
 	    }
@@ -342,17 +353,25 @@ class SDL2Frontend : public BlueberrnFrontend
 		    case SDL_KEYDOWN:
 		    case SDL_KEYUP:
 		    {
+			// blueberrn-SDL key mappings (similar to MAME):
+			// 5 - Insert credit
+			// 1 - P1 Start
+			// Left - P1 Left
+			// Right - P1 Right
+			// Up - P1 Up
+			// Down - P1 Down
+			// Left Ctrl - P1 Fire
 			bool is_pressed = (event.type == SDL_KEYDOWN);
 
 			switch (event.key.keysym.sym)
 			{
-			    case SDLK_c: core->keychanged(BerrnInput::BerrnCoin, is_pressed); break;
-			    case SDLK_RETURN: core->keychanged(BerrnInput::BerrnStartP1, is_pressed); break;
+			    case SDLK_5: core->keychanged(BerrnInput::BerrnCoin, is_pressed); break;
+			    case SDLK_1: core->keychanged(BerrnInput::BerrnStartP1, is_pressed); break;
 			    case SDLK_LEFT: core->keychanged(BerrnInput::BerrnLeftP1, is_pressed); break;
 			    case SDLK_RIGHT: core->keychanged(BerrnInput::BerrnRightP1, is_pressed); break;
 			    case SDLK_UP: core->keychanged(BerrnInput::BerrnUpP1, is_pressed); break;
 			    case SDLK_DOWN: core->keychanged(BerrnInput::BerrnDownP1, is_pressed); break;
-			    case SDLK_a: core->keychanged(BerrnInput::BerrnFireP1, is_pressed); break;
+			    case SDLK_LCTRL: core->keychanged(BerrnInput::BerrnFireP1, is_pressed); break;
 			}
 		    }
 		    break;
@@ -397,6 +416,40 @@ class SDL2Frontend : public BlueberrnFrontend
 		
 	    renderui();
 	}
+
+	void limitframerate()
+	{
+	    framecurrenttime = SDL_GetTicks();
+
+	    auto driver = core->getDriver();
+
+	    float framerate = 60;
+
+	    if (driver != NULL)
+	    {
+		framerate = driver->get_framerate();
+	    }
+
+	    int64_t frame_period = (1000 / framerate);
+
+	    if ((framecurrenttime - framestarttime) < frame_period)
+	    {
+		SDL_Delay(16 - (framecurrenttime - framestarttime));
+	    }
+
+	    framestarttime = SDL_GetTicks();
+
+	    fpscount += 1;
+
+	    if (((SDL_GetTicks() - fpstime) >= 1000))
+	    {
+		fpstime = SDL_GetTicks();
+		stringstream title;
+		title << "blueberrn-SDL-" << fpscount << " FPS";
+		SDL_SetWindowTitle(window, title.str().c_str());
+		fpscount = 0;
+	    }
+	}
 				
 	void renderui()
 	{
@@ -413,7 +466,7 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	void resizewindow()
 	{
-	    SDL_SetWindowSize(window, (width * scale), ((height + menuheight) * scale));
+	    SDL_SetWindowSize(window, (width * scale), ((height * scale) + menuheight));
 	}
 				
 	void resize(int w, int h, int s)
@@ -423,33 +476,37 @@ class SDL2Frontend : public BlueberrnFrontend
 	    scale = s;
 	    resizewindow();
 	}
-				
-	void rendertex(BerrnTex tex)
-	{
-	    SDL_Texture *frametex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, width, height);
-	    SDL_SetTextureBlendMode(frametex, SDL_BLENDMODE_BLEND);
-	    SDL_SetRenderTarget(render, frametex);
-			
-	    SDL_Rect rect = {tex.x, (tex.y + menuheight), (tex.width * scale), (tex.height * scale)};
-					
-	    assert(render && frametex);
-	    SDL_UpdateTexture(frametex, NULL, tex.buffer.data(), (width * sizeof(berrnRGBA)));
-				
-	    maintex.push({frametex, rect});
-	}
-				
+
 	void drawpixels()
 	{
 	    SDL_RenderClear(render);
+	    BerrnBitmap *bitmap = core->getDriver()->getScreen();
 
-	    while (!maintex.empty())
+	    if (bitmap == NULL)
 	    {
-		SDL2Tex tex = maintex.front();
-		SDL_SetRenderTarget(render, NULL);
-		SDL_RenderCopy(render, tex.tex, NULL, &tex.rect);
-		maintex.pop();
-		SDL_DestroyTexture(tex.tex);
+		return;
 	    }
+
+	    int berrn_w = bitmap->width();
+	    int berrn_h = bitmap->height();
+
+	    SDL_Texture *bitmapTex = NULL;
+
+	    if (bitmap->format() == BerrnRGB)
+	    {
+		BerrnBitmapRGB *rgbBitmap = reinterpret_cast<BerrnBitmapRGB*>(bitmap);
+
+		bitmapTex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, berrn_w, berrn_h);
+
+		assert(bitmapTex);
+		SDL_UpdateTexture(bitmapTex, NULL, rgbBitmap->data().data(), rgbBitmap->pitch());
+	    }
+
+	    SDL_Rect dst_rect = {0, menuheight, (width * scale), (height * scale)};
+
+	    assert(render && bitmapTex);
+	    SDL_RenderCopy(render, bitmapTex, NULL, &dst_rect);
+	    SDL_DestroyTexture(bitmapTex);
 	}
 
 	void initbasepath()
@@ -477,17 +534,22 @@ class SDL2Frontend : public BlueberrnFrontend
 	    return fs::is_directory(path);
 	}
 
-	bool loadzip(string filename)
+	int loadzip(string filename)
 	{
-	    zip = zip_open(filename.c_str(), 0, 'r');
+	    cout << "Loading ZIP file of " << filename << endl;
+	    struct zip_t *zip = zip_open(filename.c_str(), 0, 'r');
 
 	    if (zip == NULL)
 	    {
 		cout << "Error: could not load ZIP file" << endl;
-		return false;
+		return -1;
 	    }
 
-	    return true;
+	    int id = zip_files.size();
+
+	    zip_files.push_back(zip);
+
+	    return id;
 	}
 
 	vector<uint8_t> readfile(string filename)
@@ -509,9 +571,16 @@ class SDL2Frontend : public BlueberrnFrontend
 	    return temp;
 	}
 
-	vector<uint8_t> readfilefromzip(string filename)
+	vector<uint8_t> readfilefromzip(int id, string filename)
 	{
 	    vector<uint8_t> temp;
+
+	    if (id == -1)
+	    {
+		return temp;
+	    }
+
+	    struct zip_t *zip = zip_files.at(id);
 
 	    if (zip == NULL)
 	    {
@@ -540,16 +609,21 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	void closezip()
 	{
-	    if (zip != NULL)
+	    for (auto &zip : zip_files)
 	    {
-		zip_close(zip);
-		zip = NULL;
+		if (zip != NULL)
+		{
+		    zip_close(zip);
+		    zip = NULL;
+		}
 	    }
+
+	    zip_files.clear();
 	}
 
 	// Audio logic (samples logic powered by cmixer)
 	// TODO: Make overall audio API more robust
-	int getSampleRate()
+	uint32_t getSampleRate()
 	{
 	    return 48000;
 	}
@@ -577,7 +651,7 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	bool setSoundLoop(int id, bool is_loop)
 	{
-	    if ((id < 0) || (id >= static_cast<int>(samplesounds.size())))
+	    if ((id < 0) || (id >= int(samplesounds.size())))
 	    {
 		return false;
 	    }
@@ -589,7 +663,7 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	bool playSound(int id)
 	{
-	    if ((id < 0) || (id >= static_cast<int>(samplesounds.size())))
+	    if ((id < 0) || (id >= int(samplesounds.size())))
 	    {
 		return false;
 	    }
@@ -600,7 +674,7 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	bool stopSound(int id)
 	{
-	    if ((id < 0) || (id >= static_cast<int>(samplesounds.size())))
+	    if ((id < 0) || (id >= int(samplesounds.size())))
 	    {
 		return false;
 	    }
@@ -611,7 +685,7 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	bool setSoundVol(int id, double vol)
 	{
-	    if ((id < 0) || (id >= static_cast<int>(samplesounds.size())))
+	    if ((id < 0) || (id >= int(samplesounds.size())))
 	    {
 		return false;
 	    }
@@ -698,15 +772,23 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	bool is_dir_check = false;
 
-	struct zip_t *zip = NULL;
-				
 	struct SDL2Tex
 	{
 	    SDL_Texture *tex = NULL;
 	    SDL_Rect rect;
 	};
-		
+
 	queue<SDL2Tex> maintex;
+
+	struct zip_t *zip = NULL;
+
+	vector<struct zip_t*> zip_files;
+
+	int fpscount = 0;
+	Uint32 fpstime = 0;
+
+	Uint32 framecurrenttime = 0;
+	Uint32 framestarttime = 0;
 
 	vector<cm_Source*> samplesounds;
 

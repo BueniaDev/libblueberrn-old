@@ -33,68 +33,62 @@ using namespace std;
 
 namespace berrn
 {
-    using invoutputfunc = function<void(int, bool)>;
-
-    class LIBBLUEBERRN_API InvadersInterface : public BerrnInterface
+    class LIBBLUEBERRN_API InvadersCore : public BerrnInterface
     {
 	public:
-	    InvadersInterface();
-	    ~InvadersInterface();
+	    InvadersCore(berrndriver &drv);
+	    ~InvadersCore();
 
-	    void init();
-	    void shutdown();
+	    bool init_core();
+	    void shutdown_core();
+	    void run_core();
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
 	    uint8_t portIn(uint16_t port);
 	    void portOut(uint16_t port, uint8_t val);
-	    void updatePixels();
 
-	    void setsoundcallback(invoutputfunc cb)
-	    {
-		invoutput = cb;
-	    }
-
-	    vector<uint8_t> &get_gamerom()
-	    {
-		return gamerom;
-	    }
-
-	    array<berrnRGBA, (256 * 224)> get_framebuffer() const
-	    {
-		return framebuffer;
-	    }
-
-	    void coin(bool is_pressed);
-	    void p1start(bool is_pressed);
-	    void p1left(bool is_pressed);
-	    void p1right(bool is_pressed);
-	    void p1fire(bool is_pressed);
+	    void key_changed(BerrnInput key, bool is_pressed);
 
 	private:
-	    vector<uint8_t> gamerom;
-	    vector<uint8_t> workram;
-	    vector<uint8_t> videoram;
+	    berrndriver &driver;
 
-	    invoutputfunc invoutput;
+	    BerrnScheduler scheduler;
+	    Berrn8080Processor *main_proc = NULL;
+	    BerrnCPU *main_cpu = NULL;
+
+	    vector<int> sound_IDs;
+
+	    void load_sound(string filename);
+
+	    void play_sound(int id, bool is_playing = true);
+
+	    void write_sound_port(int bank, uint8_t data);
+	    bool is_rising_edge(uint8_t data, uint8_t prev_data, int bit);
+	    bool is_falling_edge(uint8_t data, uint8_t prev_data, int bit);
+
+	    mb14241shifter shifter;
+
+	    uint8_t port1_val = 0;
 
 	    uint8_t prev_port3 = 0;
 	    uint8_t prev_port5 = 0;
 
-	    void write_sound_port(int bank, uint8_t val);
+	    BerrnTimer *vblank_timer = NULL;
+	    BerrnTimer *interrupt_timer = NULL;
+	    BerrnTimer *sound_timer = NULL;
 
-	    void play_sound(int id, bool is_playing = true);
+	    vector<uint8_t> main_rom;
+	    array<uint8_t, 0x400> work_ram;
+	    array<uint8_t, 0x1C00> video_ram;
+
+	    void update_pixels();
+
+	    bool is_end_of_frame = false;
+
+	    BerrnBitmapRGB *bitmap = NULL;
 
 	    void debugPort(uint8_t val);
-
-	    uint8_t port1_val = 0;
-
-	    mb14241shifter shifter;
-
-	    array<berrnRGBA, (256 * 224)> framebuffer;
-
-	    const size_t width = 224;
-	    const size_t height = 256;
     };
 
     class LIBBLUEBERRN_API driverinvaders : public berrndriver
@@ -103,8 +97,7 @@ namespace berrn
 	    driverinvaders();
 	    ~driverinvaders();
 
-	    virtual string drivername();
-	    virtual void loadROMs();
+	    string drivername();
 	    bool hasdriverROMs();
 
 	    bool drvinit();
@@ -113,23 +106,8 @@ namespace berrn
 
 	    void keychanged(BerrnInput key, bool is_pressed);
 
-	    void interrupt_handler();
-
 	private:
-	    vector<int> sound_IDs;
-
-	    InvadersInterface inter;
-	    BerrnScheduler scheduler;
-
-	    void sound_handler(int id, bool is_playing);
-	    void load_sound(string filename);
-
-	    Berrn8080Processor *invaders_proc = NULL;
-	    BerrnCPU *invaders_cpu = NULL;
-	    BerrnTimer *interrupt_timer = NULL;
-	    BerrnTimer *sound_timer = NULL;
-
-	    bool is_end_of_frame = false;
+	    InvadersCore *inv_core = NULL;
     };
 };
 

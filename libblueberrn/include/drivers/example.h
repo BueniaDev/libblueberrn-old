@@ -45,6 +45,8 @@ namespace berrn
 
 	private:
 	    int sample_val = 0;
+
+	    BerrnBitmapRGB *bitmap = NULL;
     };
 };
 

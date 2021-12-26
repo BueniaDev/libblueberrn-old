@@ -18,6 +18,11 @@ namespace berrn
 
 	    DriverList list;
 	    berrndriver *driver;
+
+	    berrndriver *getDriver()
+	    {
+		return driver;
+	    }
       
 	    BlueberrnFrontend *front = NULL;
       

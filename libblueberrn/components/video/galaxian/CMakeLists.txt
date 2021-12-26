@@ -1,3 +1,0 @@
-set(GALAXIAN_HEADERS
-	"galaxian.h"
-	PARENT_SCOPE)

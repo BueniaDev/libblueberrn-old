@@ -22,7 +22,7 @@
 #include <libblueberrn_api.h>
 #include <driver.h>
 #include <cpu/zilogz80.h>
-#include <audio/wsg3.h>
+#include <video/pacman.h>
 #include <iostream>
 #include <string>
 using namespace berrn;
@@ -33,127 +33,51 @@ namespace berrn
     class LIBBLUEBERRN_API PacmanInterface : public BerrnInterface
     {
 	public:
-	    PacmanInterface();
+	    PacmanInterface(berrndriver &drv);
 	    ~PacmanInterface();
 
-	    void init();
-	    void shutdown();
+	    bool init_core();
+	    void shutdown_core();
+	    void run_core();
+
+	    void key_changed(BerrnInput key, bool is_pressed);
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
 	    uint8_t readOp8(uint16_t addr);
-	    void portOut(uint16_t port, uint8_t val);
-	    void updatePixels();
-
-	    vector<uint8_t> &get_gamerom()
-	    {
-		return gamerom;
-	    }
-
-	    vector<uint8_t> &get_color_rom()
-	    {
-		return color_rom;
-	    }
-
-	    vector<uint8_t> &get_pal_rom()
-	    {
-		return pal_rom;
-	    }
-
-	    vector<uint8_t> &get_tile_rom()
-	    {
-		return tile_rom;
-	    }
-
-	    vector<uint8_t> &get_sprite_rom()
-	    {
-		return sprite_rom;
-	    }
-
-	    vector<uint8_t> &get_sound_rom()
-	    {
-		return sound_rom;
-	    }
-
-	    bool is_vblank_enabled()
-	    {
-		return vblank_enable;
-	    }
-
-	    bool is_sound_enabled()
-	    {
-		return sound_enable;
-	    }
-
-	    uint8_t get_int_vec()
-	    {
-		return int_vector;
-	    }
-
-	    array<berrnRGBA, (288 * 224)> get_framebuffer() const
-	    {
-		return framebuffer;
-	    }
-
-	    uint32_t get_wsg3_sample_rate()
-	    {
-		return pac_sound.get_sample_rate();
-	    }
-
-	    void clock_wsg3()
-	    {
-		pac_sound.clockchip();
-	    }
-
-	    array<int16_t, 2> get_wsg3_sample()
-	    {
-		return pac_sound.get_sample();
-	    }
-
-	    void coin(bool is_pressed);
-	    void p1up(bool is_pressed);
-	    void p1down(bool is_pressed);
-	    void p1left(bool is_pressed);
-	    void p1right(bool is_pressed);
-	    void p1start(bool is_pressed);
+	    void portOut(uint16_t port, uint8_t data);
 
 	private:
+	    berrndriver &driver;
+
 	    uint8_t readByte(uint16_t addr);
+	    void writeByte(uint16_t addr, uint8_t data);
+
+	    uint8_t readUpper(uint16_t addr);
+	    void writeUpper(uint16_t addr, uint8_t data);
 
 	    void writeIO(int addr, uint8_t data);
 
-	    array<uint8_t, 4> get_palette(int pal_num);
+	    void writePort(uint16_t port, uint8_t data);
 
-	    void decode_images();
-	    void decode_strip(const uint8_t *src, uint8_t *dst, int bx, int by, int width);
+	    void update_pixels();
 
-	    void draw_tile(uint8_t tile_num, array<uint8_t, 4> palette, int xcoord, int ycoord);
-	    void draw_sprite(uint8_t sprite_num, array<uint8_t, 4> palette, int xcoord, int ycoord, bool flipx, bool flipy);
-	    void set_pixel(int xpos, int ypos, uint8_t color_num);
+	    BerrnScheduler scheduler;
+	    BerrnZ80Processor *main_proc = NULL;
+	    BerrnCPU *main_cpu = NULL;
 
-	    vector<uint8_t> gamerom;
-	    array<uint8_t, 0x400> vram;
-	    array<uint8_t, 0x400> cram;
-	    array<uint8_t, 0x3F0> mainram;
-	    array<uint8_t, 0x10> oam;
-	    array<uint8_t, 0x10> sprite_pos;
-	    vector<uint8_t> color_rom;
-	    vector<uint8_t> pal_rom;
-	    vector<uint8_t> tile_rom;
-	    vector<uint8_t> sprite_rom;
-	    vector<uint8_t> tile_ram;
-	    vector<uint8_t> sprite_ram;
-	    vector<uint8_t> sound_rom;
-	    bool vblank_enable = false;
-	    bool sound_enable = false;
-	    bool flip_screen = false;
-	    array<berrnRGBA, (288 * 224)> framebuffer;
+	    BerrnTimer *interrupt_timer = NULL;
+	    BerrnTimer *vblank_timer = NULL;
 
-	    uint8_t int_vector = 0;
-	    uint8_t in0_val = 0;
-	    uint8_t in1_val = 0;
+	    pacmanvideo *video_core = NULL;
 
-	    wsg3audio pac_sound;
+	    vector<uint8_t> game_rom;
+
+	    array<uint8_t, 0x3F0> ram;
+
+	    bool is_irq_enabled = false;
+
+	    uint8_t irq_vector = 0;
     };
 
     class LIBBLUEBERRN_API driverpacman : public berrndriver
@@ -165,31 +89,16 @@ namespace berrn
 	    string drivername();
 	    bool hasdriverROMs();
 
-	    virtual void loadROMs();
-
 	    bool drvinit();
 	    void drvshutdown();
 	    void drvrun();
 
+	    float get_framerate();
+
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    PacmanInterface inter;
-	    BerrnScheduler scheduler;
-
-	    void interrupt_handler();
-	    void sound_clock();
-
-	    BerrnZ80Processor *pacman_proc = NULL;
-	    BerrnCPU *pacman_cpu = NULL;
-
-	    BerrnTimer *interrupt_timer = NULL;
-	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *sound_timer = NULL;
-
-	    float out_step = 0.0f;
-	    float in_step = 0.0f;
-	    float out_time = 0.0f;
+	    PacmanInterface *inter = NULL;
     };
 };
 

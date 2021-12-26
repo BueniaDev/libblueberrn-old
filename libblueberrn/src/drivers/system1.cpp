@@ -38,7 +38,8 @@ namespace berrn
 
     Sys1MainInterface::Sys1MainInterface()
     {
-
+	framebitmap = new BerrnBitmapRGB(512, 224);
+	framebitmap->clear();
     }
 
     Sys1MainInterface::~Sys1MainInterface()
@@ -153,6 +154,31 @@ namespace berrn
 	return data;
     }
 
+    void Sys1MainInterface::writeVideoMode(uint8_t data)
+    {
+	if (testbit(data, 7))
+	{
+	    cout << "Screen is flipped" << endl;
+	}
+	else
+	{
+	    cout << "Screen is normal" << endl;
+	}
+
+	is_screen_blank = testbit(data, 4);
+    }
+
+    void Sys1MainInterface::updatePixels()
+    {
+	if (is_screen_blank)
+	{
+	    framebitmap->fillcolor(black());
+	    return;
+	}
+
+	framebitmap->fillcolor(red());
+    }
+
     SegaSys1PPI::SegaSys1PPI()
     {
 	scheduler.set_interleave(100);
@@ -164,6 +190,10 @@ namespace berrn
 
 	interrupt_timer = new BerrnTimer("IRQMain", scheduler, [&](int64_t, int64_t) {
 	    interruptHandler(0);
+	});
+
+	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t) {
+	    main_inter.updatePixels();
 	});
     }
 
@@ -188,6 +218,9 @@ namespace berrn
 
 	main_inter.init();
 	main_ppi.init();
+	main_ppi.set_out_portb_callback([&](uint8_t data) -> void {
+	    writeVideoMode(data);
+	});
 
 	interrupt_timer->start(time_in_hz(60), true);
 	return;
@@ -199,6 +232,11 @@ namespace berrn
 	{
 	    main_proc->fire_interrupt8(0xFF); // RST 38H
 	}
+    }
+
+    void SegaSys1PPI::writeVideoMode(uint8_t data)
+    {
+	main_inter.writeVideoMode(data);
     }
 
     void SegaSys1PPI::shutdown()
@@ -307,20 +345,23 @@ namespace berrn
 
     void driverwboy2u::loadROMs()
     {
+	/*
 	loadROM("ic129_02.bin", 0x0000, 0x2000, core_sys1.get_main_rom());
 	loadROM("ic130_03.bin", 0x2000, 0x2000, core_sys1.get_main_rom());
 	loadROM("ic131_04.bin", 0x4000, 0x2000, core_sys1.get_main_rom());
 	loadROM("ic132_05.bin", 0x6000, 0x2000, core_sys1.get_main_rom());
 	loadROM("epr-7591.133", 0x8000, 0x2000, core_sys1.get_main_rom());
 	loadROM("epr-7591.133", 0xA000, 0x2000, core_sys1.get_main_rom());
+	loadROM("pr-5317.76", 0x0000, 0x0100, core_sys1.get_lookup_prom());
+	*/
     }
 
     bool driverwboy2u::drvinit()
     {
-	loadROMs();
+	// loadROMs();
 	core_sys1.init();
-	resize(512, 224, 2);
-	return isallfilesloaded();
+	resize(640, 480, 1);
+	return false;
     }
 
     void driverwboy2u::drvshutdown()
@@ -331,7 +372,7 @@ namespace berrn
     void driverwboy2u::drvrun()
     {
 	core_sys1.run();
-	fillrect(0, 0, 512, 224, red());
+	setScreen(core_sys1.getBitmap());
     }
 
     void driverwboy2u::keychanged(BerrnInput key, bool is_pressed)

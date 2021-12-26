@@ -23,6 +23,8 @@
 #include <invaders.h>
 #include <galaxian.h>
 #include <pacman.h>
+#include <galaga.h>
 #include <system1.h>
+#include <rastan.h>
 
 #endif // BERRN_DRIVERS

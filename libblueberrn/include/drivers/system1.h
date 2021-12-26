@@ -55,6 +55,11 @@ namespace berrn
 		return gamerom;
 	    }
 
+	    vector<uint8_t> &get_lookup_prom()
+	    {
+		return lookup_prom;
+	    }
+
 	    void setinputcallback(sys1inputfunc cb)
 	    {
 		inputcb = cb;
@@ -65,10 +70,19 @@ namespace berrn
 		outputcb = cb;
 	    }
 
+	    BerrnBitmap *getBitmap()
+	    {
+		return framebitmap;
+	    }
+
+	    void updatePixels();
+	    void writeVideoMode(uint8_t data);
+
 	private:
 	    uint8_t readByte(uint16_t addr);
 
 	    vector<uint8_t> gamerom;
+	    vector<uint8_t> lookup_prom;
 	    array<uint8_t, 0x1000> mainram;
 	    array<uint8_t, 0x1000> vram;
 	    array<uint8_t, 0x800> pram;
@@ -76,6 +90,10 @@ namespace berrn
 
 	    sys1inputfunc inputcb;
 	    sys1outputfunc outputcb;
+
+	    BerrnBitmapRGB *framebitmap = NULL;
+
+	    bool is_screen_blank = false;
     };
 
     // Core logic for the Sega System 1 hardware
@@ -94,13 +112,24 @@ namespace berrn
 		return main_inter.get_gamerom();
 	    }
 
+	    vector<uint8_t> &get_lookup_prom()
+	    {
+		return main_inter.get_lookup_prom();
+	    }
+
+	    BerrnBitmap *getBitmap()
+	    {
+		return main_inter.getBitmap();
+	    }
+
 	private:
 	    Sys1MainInterface main_inter;
 	    BerrnScheduler scheduler;
 
+	    BerrnTimer *vblank_timer = NULL;
 	    BerrnTimer *interrupt_timer = NULL;
 
-	    // array<berrnRGBA, (512 * 224)> framebuffer;
+	    array<berrnRGBA, (512 * 224)> framebuffer;
 
 	    BerrnZ80Processor *main_proc = NULL;
 	    BerrnCPU *main_cpu = NULL;
@@ -108,6 +137,8 @@ namespace berrn
 	    uint8_t readInput(int addr);
 	    void writeOutput(int addr, uint8_t data);
 	    void interruptHandler(int param);
+
+	    void writeVideoMode(uint8_t data);
 
 	    i8255ppi main_ppi;
     };

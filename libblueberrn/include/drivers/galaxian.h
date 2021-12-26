@@ -22,6 +22,7 @@
 #include <libblueberrn_api.h>
 #include <driver.h>
 #include <cpu/zilogz80.h>
+#include <video/galaxian.h>
 #include <iostream>
 #include <string>
 using namespace berrn;
@@ -32,98 +33,44 @@ namespace berrn
     class LIBBLUEBERRN_API GalaxianInterface : public BerrnInterface
     {
 	public:
-	    GalaxianInterface();
+	    GalaxianInterface(berrndriver &drv);
 	    ~GalaxianInterface();
 
-	    void init();
-	    void shutdown();
+	    bool init_core();
+	    void shutdown_core();
+	    void run_core();
+
+	    void key_changed(BerrnInput key, bool is_pressed);
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
 	    uint8_t readOp8(uint16_t addr);
-	    void updatePixels();
-
-	    vector<uint8_t> &get_gamerom()
-	    {
-		return gamerom;
-	    }
-
-	    vector<uint8_t> &get_tilerom()
-	    {
-		return tilerom;
-	    }
-
-	    vector<uint8_t> &get_palrom()
-	    {
-		return palrom;
-	    }
-
-	    array<berrnRGBA, (256 * 224)> get_framebuffer() const
-	    {
-		return framebuffer;
-	    }
-
-	    void star_scroll_callback();
-
-	    bool irq_enabled()
-	    {
-		return is_irq_enabled;
-	    }
-
-	    void coin(bool is_pressed);
 
 	private:
-	    vector<uint8_t> char_data;
-	    vector<uint8_t> sprite_data;
+	    berrndriver &driver;
 
-	    array<uint8_t, 4> get_palette(int color);
-	    void draw_tile(uint8_t tile_num, int x, int y, array<uint8_t, 4> palette);
-	    void draw_sprite(uint8_t sprite_num, int xpos, int ypos, bool flip_x, bool flip_y, array<uint8_t, 4> palette);
-	    void set_pixel(int xpos, int ypos, uint8_t color);
-	    void decode_images();
-	    // TODO: Implement native tile decoding in core driver API
-	    void decode_char(const uint8_t *src, uint8_t *dst, int ox, int oy, int width);
-
-	    // Tile and sprite decoding functions
-	    void decode_tile(const uint8_t *src, uint8_t *dst);
-	    void decode_sprite(const uint8_t *src, uint8_t *dst);
-
-	    void init_starfield();
-	    void draw_starfield();
-
-	    void set_raw_pixel(int xpos, int ypos, berrnRGBA color);
-
-	    struct StarfieldItem
-	    {
-		int xpos = 0;
-		int ypos = 0;
-		int color = 0;
-	    };
-
-	    array<StarfieldItem, 2520> starfield;
-
-	    void draw_star_pixel(int xpos, int ypos, int color);
+	    vector<uint8_t> game_rom;
 
 	    uint8_t readByte(uint16_t addr);
-	    void writeIOupper(uint16_t addr, uint8_t data);
+	    void writeByte(uint16_t addr, uint8_t data);
 
-	    vector<uint8_t> gamerom;
-	    array<uint8_t, 0x400> gameram;
-	    vector<uint8_t> tilerom;
-	    vector<uint8_t> palrom;
+	    void write_lowerIO(int addr, uint8_t data);
+	    void write_upperIO(int addr, uint8_t data);
 
-	    array<uint8_t, 0x400> vram;
-	    array<uint8_t, 0x100> special_ram;
-	    array<berrnRGBA, (256 * 224)> framebuffer;
+	    BerrnScheduler scheduler;
+	    BerrnZ80Processor *main_proc = NULL;
+	    BerrnCPU *main_cpu = NULL;
 
-	    bool is_irq_enabled = false;
-	    bool is_stars_enabled = false;
-	    int starfield_scroll_pos = 0;
+	    BerrnTimer *vblank_timer = NULL;
+	    BerrnTimer *interrupt_timer = NULL;
 
-	    const int width = 224;
-	    const int height = 256;
+	    void update_pixels();
 
-	    uint8_t port0_val = 0;
+	    galaxianvideo *video_core = NULL;
+
+	    array<uint8_t, 0x400> ram;
+
+	    bool is_int_enabled = false;
     };
 
     class LIBBLUEBERRN_API drivergalaxian : public berrndriver
@@ -135,8 +82,6 @@ namespace berrn
 	    string drivername();
 	    bool hasdriverROMs();
 
-	    virtual void loadROMs();
-
 	    bool drvinit();
 	    void drvshutdown();
 	    void drvrun();
@@ -145,18 +90,8 @@ namespace berrn
 
 	    void keychanged(BerrnInput key, bool is_pressed);
 
-	    void interrupt_handler();
-
 	private:
-	    GalaxianInterface inter;
-	    BerrnScheduler scheduler;
-
-	    BerrnZ80Processor *galaxian_proc = NULL;
-	    BerrnCPU *galaxian_cpu = NULL;
-
-	    BerrnTimer *interrupt_timer = NULL;
-	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *star_scroll_timer = NULL;
+	    GalaxianInterface *inter = NULL;
     };
 };
 

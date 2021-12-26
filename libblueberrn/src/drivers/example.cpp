@@ -51,6 +51,9 @@ namespace berrn
 	    playSound(sample_val);
 	}
 
+	bitmap = new BerrnBitmapRGB(640, 480);
+	bitmap->fillcolor(red());
+
 	resize(640, 480, 1);
 	return true;
     }
@@ -62,9 +65,7 @@ namespace berrn
   
     void driverexample::drvrun()
     {
-	fillrect(0, 0, 640, 480, red());
-	fillrect(50, 50, 100, 100, green());
-
+	setScreen(bitmap);
 	for (int i = 0; i < (getSampleRate() / 60); i++)
 	{
 	    mixSample(getRawSample());

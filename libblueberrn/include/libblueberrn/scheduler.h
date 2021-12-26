@@ -10,6 +10,7 @@
 #include <array>
 #include <functional>
 #include <algorithm>
+#include <utils.h>
 using namespace std;
 
 namespace berrn
@@ -87,6 +88,12 @@ namespace berrn
 	    {
 		return;
 	    }
+
+	    virtual void halt(bool is_halting)
+	    {
+		(void)is_halting;
+		return;
+	    }
     };
 
     class BerrnInterface
@@ -120,6 +127,26 @@ namespace berrn
 		cout << "Reading opcode from address of " << hex << (int)addr << endl;
 		exit(0);
 		return 0;
+	    }
+
+	    virtual uint16_t readCPU16(bool upper, bool lower, uint32_t addr)
+	    {
+		cout << "Reading word from below address:" << endl;
+		cout << "Upper: " << dec << int(upper) << endl;
+		cout << "Lower: " << dec << int(lower) << endl;
+		cout << "Address: " << hex << int(addr) << endl;
+		exit(0);
+		return 0;
+	    }
+
+	    virtual void writeCPU16(bool upper, bool lower, uint32_t addr, uint16_t val)
+	    {
+		cout << "Writing word to below address:" << endl;
+		cout << "Upper: " << dec << int(upper) << endl;
+		cout << "Lower: " << dec << int(lower) << endl;
+		cout << "Address: " << hex << int(addr) << endl;
+		cout << "Data: " << hex << int(val) << endl;
+		exit(0);
 	    }
 
 	    virtual uint8_t portIn(uint16_t port)
@@ -335,6 +362,11 @@ namespace berrn
 	    int64_t timer_param;
     };
 
+    enum SuspendReason : int
+    {
+	Reset = 0,
+    };
+
     class BerrnCPU : public BerrnDevice
     {
 	public:
@@ -372,6 +404,25 @@ namespace berrn
 		return current_time;
 	    }
 
+	    bool is_suspended(SuspendReason reason)
+	    {
+		return testbit(suspend_flags, int(reason));
+	    }
+
+	    void suspend(SuspendReason reason)
+	    {
+		suspend_flags = setbit(suspend_flags, int(reason));
+		processor.abort_timeslice();
+		processor.halt(true);
+	    }
+
+	    void resume(SuspendReason reason)
+	    {
+		suspend_flags = resetbit(suspend_flags, int(reason));
+		processor.abort_timeslice();
+		processor.halt(false);
+	    }
+
 	    void stop_timeslice()
 	    {
 		processor.abort_timeslice();
@@ -392,6 +443,7 @@ namespace berrn
 	    BerrnProcessor &processor;
 
 	    int64_t current_time = 0;
+	    uint32_t suspend_flags = 0;
     };
 };
 

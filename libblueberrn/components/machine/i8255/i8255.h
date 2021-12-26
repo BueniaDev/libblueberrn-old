@@ -21,12 +21,15 @@
 
 #include <cstdint>
 #include <iostream>
+#include <functional>
 using namespace std;
 
 
 // Single-header Intel I8255 emulator (WIP)
 namespace i8255
 {
+    using i8255write = function<void(uint8_t)>;
+
     class i8255ppi
     {
 	public:
@@ -49,6 +52,11 @@ namespace i8255
 	    void shutdown()
 	    {
 		cout << "I8255::Shutting down..." << endl;
+	    }
+
+	    void set_out_portb_callback(i8255write cb)
+	    {
+		port_b_write = cb;
 	    }
 
 	    void write(int addr, uint8_t data)
@@ -120,6 +128,10 @@ namespace i8255
 
 			    // TODO: Implement I8255 callback functions
 			    cout << "Writing value of " << hex << int(data) << " to I8255 port B" << endl;
+			    if (port_b_write)
+			    {
+				port_b_write(outputs[1]);
+			    }
 			}
 		    }
 		    break;
@@ -137,6 +149,8 @@ namespace i8255
 	    bool is_port_b_input = false;
 
 	    array<uint8_t, 3> outputs;
+
+	    i8255write port_b_write;
     };
 };
 

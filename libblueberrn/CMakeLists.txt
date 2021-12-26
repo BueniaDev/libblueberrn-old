@@ -1,4 +1,6 @@
 add_subdirectory(components)
+add_subdirectory(machine)
+add_subdirectory(video)
 
 set(LIBBLUEBERRN
 	libblueberrn/src/core/libblueberrn.cpp
@@ -7,11 +9,17 @@ set(LIBBLUEBERRN
 	libblueberrn/src/drivers/invaders.cpp
 	libblueberrn/src/drivers/galaxian.cpp
 	libblueberrn/src/drivers/pacman.cpp
+	libblueberrn/src/drivers/galaga.cpp
 	libblueberrn/src/drivers/system1.cpp
+	libblueberrn/src/drivers/rastan.cpp
+	${MACHINE_SOURCES}
+	${VIDEO_SOURCES}
 	PARENT_SCOPE)
 
 set(LIBBLUEBERRN_HEADERS
 	libblueberrn/include/libblueberrn/libblueberrn_api.h
+	libblueberrn/include/libblueberrn/utils.h
+	libblueberrn/include/libblueberrn/graphics.h
 	libblueberrn/include/libblueberrn/driver.h
 	libblueberrn/include/libblueberrn/scheduler.h
 	libblueberrn/include/libblueberrn/driverlist.h
@@ -21,5 +29,9 @@ set(LIBBLUEBERRN_HEADERS
 	libblueberrn/include/drivers/invaders.h
 	libblueberrn/include/drivers/galaxian.h
 	libblueberrn/include/drivers/pacman.h
+	libblueberrn/include/drivers/galaga.h
 	libblueberrn/include/drivers/system1.h
+	libblueberrn/include/drivers/rastan.h
+	${MACHINE_HEADERS}
+	${VIDEO_HEADERS}
 	PARENT_SCOPE)

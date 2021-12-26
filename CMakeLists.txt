@@ -4,12 +4,13 @@ project(libblueberrn)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
 
 option(BUILD_SDL2 "Enables the command-line frontend (requires SDL2)." OFF)
 
 set(LIBBLUEBERRN_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/include")
 
+include_directories(AFTER PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn")
 include_directories(AFTER PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/components")
 include_directories(AFTER PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/include/libblueberrn")
 include_directories(AFTER PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/include/drivers")

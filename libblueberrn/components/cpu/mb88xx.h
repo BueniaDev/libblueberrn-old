@@ -16,94 +16,53 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef LIBBLUEBERRN_Z80_H
-#define LIBBLUEBERRN_Z80_H
+#ifndef LIBBLUEBERRN_MB88XX_H
+#define LIBBLUEBERRN_MB88XX_H
 
-#include "z80/BeeZ80/beez80.h"
+#include "mb88xx/mb88xx.h"
 #include "scheduler.h"
-using namespace beez80;
+using namespace mb88xx;
 using namespace berrn;
 
-class BerrnZ80Interface : public BeeZ80Interface
+class BerrnMB8843Interface : public mb88interface
 {
     public:
-	BerrnZ80Interface(BerrnInterface &cb) : inter(cb)
+	BerrnMB8843Interface(BerrnInterface &cb) : inter(cb)
 	{
 
 	}
 
-	~BerrnZ80Interface()
+	~BerrnMB8843Interface()
 	{
 
 	}
 
-	uint8_t readByte(uint16_t addr)
-	{
-	    return inter.readCPU8(addr);
-	}
-
-	void writeByte(uint16_t addr, uint8_t val)
-	{
-	    inter.writeCPU8(addr, val);
-	}
-
-	bool isSeperateOps()
-	{
-	    return true;
-	}
-
-	uint8_t readOpcode(uint16_t addr)
+	uint8_t readROM(uint16_t addr)
 	{
 	    return inter.readOp8(addr);
 	}
 
-	uint8_t portIn(uint16_t port)
+	void writeMem(uint16_t addr, uint8_t data)
 	{
-	    return inter.portIn(port);
-	}
-
-	void portOut(uint16_t port, uint8_t val)
-	{
-	    inter.portOut(port, val);
+	    inter.writeCPU8(addr, data);
 	}
 
     private:
 	BerrnInterface &inter;
 };
 
-class BerrnZ80Processor : public BerrnProcessor
+class BerrnMB8843Processor : public BerrnProcessor
 {
     public:
-	BerrnZ80Processor(uint64_t clk_freq, BerrnInterface &cb) : clock_freq(clk_freq), inter(cb)
+	BerrnMB8843Processor(uint64_t clk_freq, BerrnInterface &cb) : clock_freq(clk_freq), inter(cb)
 	{
-	    procinter = new BerrnZ80Interface(inter);
-	    core.setinterface(procinter);
+	    procinter = new BerrnMB8843Interface(inter);
+	    core.set_interface(procinter);
 	}
 
-	~BerrnZ80Processor()
+	~BerrnMB8843Processor()
 	{
 
-	}
-
-	void fire_nmi()
-	{
-	    core.generate_nmi();
-	}
-
-	void set_irq_vector(uint8_t opcode)
-	{
-	    core.generate_interrupt(opcode, is_irq_line);
-	}
-
-	void fire_interrupt8(uint8_t opcode, bool is_line = true)
-	{
-	    core.generate_interrupt(opcode, is_line);
-	    is_irq_line = is_line;
-	}
-
-	void set_prescalers(int cycle_pres, int m1_pres)
-	{
-	    core.set_prescalers(cycle_pres, m1_pres);
 	}
 
 	void init()
@@ -147,7 +106,10 @@ class BerrnZ80Processor : public BerrnProcessor
 		}
 		else
 		{
-		    cycles_left -= core.runinstruction();
+		    int cycles = core.runinstruction();
+		    cycles_left -= cycles;
+		    // TODO: Implement PIO in core
+		    // core.updatePIO(cycles);
 		}
 	    }
 
@@ -166,15 +128,13 @@ class BerrnZ80Processor : public BerrnProcessor
 
     private:
 	uint64_t clock_freq = 0;
-	BerrnZ80Interface *procinter = NULL;
+	BerrnMB8843Interface *procinter = NULL;
 	BerrnInterface &inter;
-	BeeZ80 core;
+	mb8843 core;
 	int64_t current_cycles = 0;
 	int64_t cycles_left = 0;
 	bool is_stopped = true;
 	bool is_halted = false;
-
-	bool is_irq_line = false;
 };
 
-#endif // LIBBLUEBERRN_Z80_H
+#endif // LIBBLUEBERRN_MB88XX_H

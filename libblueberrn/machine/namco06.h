@@ -16,10 +16,35 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef LIBBLUEBERRN_GALAXIAN_VID_H
-#define LIBBLUEBERRN_GALAXIAN_VID_H
+#ifndef BERRN_NAMCO06_H
+#define BERRN_NAMCO06_H
 
-#include "galaxian/galaxian.h"
-using namespace galaxianvid;
+#include <libblueberrn_api.h>
+#include <utils.h>
+#include <scheduler.h>
+using namespace berrn;
+using namespace std;
 
-#endif // LIBBLUEBERRN_GALAXIAN_VID_H
+namespace berrn
+{
+    class namco06xx
+    {
+	public:
+	    namco06xx(BerrnCPU &cpu);
+	    ~namco06xx();
+
+	    uint8_t readControl();
+
+	    void writeControl(uint8_t data);
+	    void writeData(uint8_t data);
+
+	private:
+	    BerrnTimer *timer = NULL;
+	    BerrnCPU &main_cpu;
+
+	    uint8_t control_reg = 0;
+    };
+};
+
+
+#endif // BERRN_NAMCO06_H

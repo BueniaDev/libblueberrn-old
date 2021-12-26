@@ -21,9 +21,49 @@ using namespace berrn;
 
 namespace berrn
 {
-    PacmanInterface::PacmanInterface()
-    {
+    berrn_rom_start(pacman)
+	berrn_rom_region("cpu", 0x4000)
+	    berrn_rom_load("pacman.6e", 0x0000, 0x1000)
+            berrn_rom_load("pacman.6f", 0x1000, 0x1000)
+            berrn_rom_load("pacman.6h", 0x2000, 0x1000)
+	    berrn_rom_load("pacman.6j", 0x3000, 0x1000)
+	berrn_rom_region("color", 0x0020)
+	    berrn_rom_load("82s123.7f", 0x0000, 0x0020)
+	berrn_rom_region("pal", 0x0100)
+	    berrn_rom_load("82s126.4a", 0x0000, 0x0100)
+	berrn_rom_region("gfx1", 0x1000)
+	    berrn_rom_load("pacman.5e", 0x0000, 0x1000)
+	berrn_rom_region("gfx2", 0x1000)
+	    berrn_rom_load("pacman.5f", 0x0000, 0x1000)
+	berrn_rom_region("sound", 0x0200)
+	    berrn_rom_load("82s126.1m", 0x0000, 0x0100)
+	    berrn_rom_load("82s126.3m", 0x0100, 0x0100)
+    berrn_rom_end
 
+    PacmanInterface::PacmanInterface(berrndriver &drv) : driver(drv)
+    {
+	video_core = new pacmanvideo(driver);
+
+	main_proc = new BerrnZ80Processor(3072000, *this);
+	main_cpu = new BerrnCPU(scheduler, *main_proc);
+
+	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
+	{
+	    update_pixels();
+	});
+
+	interrupt_timer = new BerrnTimer("Interrupt", scheduler, [&](int64_t param, int64_t)
+	{
+	    if (param == 1)
+	    {
+		interrupt_timer->start(16500, true);
+	    }
+
+	    if (is_irq_enabled)
+	    {
+		main_proc->fire_interrupt8(irq_vector);
+	    }
+	});
     }
 
     PacmanInterface::~PacmanInterface()
@@ -31,83 +71,61 @@ namespace berrn
 
     }
 
-    void PacmanInterface::init()
+    bool PacmanInterface::init_core()
     {
-	in0_val = 0xFF;
-	in1_val = 0xFF;
-	gamerom.resize(0x4000, 0);
-	vram.fill(0);
-	cram.fill(0);
-	mainram.fill(0);
-	framebuffer.fill(black());
-	color_rom.resize(0x20, 0);
-	pal_rom.resize(0x100, 0);
-	tile_rom.resize(0x1000, 0);
-	sprite_rom.resize(0x1000, 0);
-	tile_ram.resize((256 * 8 * 8), 0);
-	sprite_ram.resize((64 * 16 * 16), 0);
-	sound_rom.resize(512, 0);
-	decode_images();
-	pac_sound.init(sound_rom);
-    }
+	scheduler.reset();
+	scheduler.add_device(main_cpu);
+	main_proc->init();
+	video_core->init();
 
-    void PacmanInterface::decode_images()
-    {
-	for (int tile_num = 0; tile_num < 256; tile_num++)
+	vblank_timer->start(16500, true);
+	interrupt_timer->start(14000, false, 1);
+
+	for (int i = 0; i < 8; i++)
 	{
-	    uint8_t *dst = &tile_ram[(tile_num * 64)];
-	    const uint8_t *src = &tile_rom[(tile_num * 16)];
-	    decode_strip((src + 0), dst, 0, 4, 8);
-	    decode_strip((src + 8), dst, 0, 0, 8);
+	    writeIO(i, 0);
 	}
 
-	for (int sprite_num = 0; sprite_num < 64; sprite_num++)
-	{
-	    uint8_t *dst = &sprite_ram[(sprite_num * 16 * 16)];
-	    const uint8_t *src = &sprite_rom[(sprite_num * 64)];
+	ram.fill(0);
 
-	    decode_strip((src + 0), dst, 8, 12, 16);
-	    decode_strip((src + 8), dst, 8, 0, 16);
-	    decode_strip((src + 16), dst, 8, 4, 16);
-	    decode_strip((src + 24), dst, 8, 8, 16);
-
-	    decode_strip((src + 32), dst, 0, 12, 16);
-	    decode_strip((src + 40), dst, 0, 0, 16);
-	    decode_strip((src + 48), dst, 0, 4, 16);
-	    decode_strip((src + 56), dst, 0, 8, 16);
-	}
+	driver.resize(224, 288, 2);
+	game_rom = driver.get_rom_region("cpu");
+	return true;
     }
 
-    // TODO: Implement native tile decoding in the core driver API
-    void PacmanInterface::decode_strip(const uint8_t *src, uint8_t *dst, int bx, int by, int width)
+    void PacmanInterface::shutdown_core()
     {
-	int base_index = (bx + (by * width));
+	video_core->shutdown();
+	main_proc->shutdown();
+	interrupt_timer->stop();
+	vblank_timer->stop();
 
-	for (int xpos = 0; xpos < 8; xpos++)
+	scheduler.remove_timer(interrupt_timer);
+	scheduler.remove_timer(vblank_timer);
+	scheduler.remove_device(main_cpu);
+    }
+
+    void PacmanInterface::run_core()
+    {
+	int64_t schedule_time = scheduler.get_current_time();
+
+	int64_t frame_time = 16500;
+
+	while (scheduler.get_current_time() < (schedule_time + frame_time))
 	{
-	    uint8_t strip = src[xpos];
-
-	    for (int ypos = 0; ypos < 4; ypos++)
-	    {
-		int index = ((3 - ypos) * width + (7 - xpos));
-		uint32_t addr = (base_index + index);
-		dst[addr] = changebit(dst[addr], 0, testbit(strip, ypos));
-		dst[addr] = changebit(dst[addr], 1, testbit(strip, (4 + ypos)));
-	    }
+	    scheduler.timeslice();
 	}
     }
 
-    void PacmanInterface::shutdown()
+    void PacmanInterface::key_changed(BerrnInput key, bool is_pressed)
     {
-	pac_sound.shutdown();
-	sound_rom.clear();
-	sprite_ram.clear();
-	sprite_rom.clear();
-	tile_ram.clear();
-	tile_rom.clear();
-	pal_rom.clear();
-	color_rom.clear();
-	gamerom.clear();
+
+    }
+
+    void PacmanInterface::update_pixels()
+    {
+	video_core->updatePixels();
+	driver.setScreen(video_core->get_bitmap());
     }
 
     uint8_t PacmanInterface::readCPU8(uint16_t addr)
@@ -117,53 +135,7 @@ namespace berrn
 
     void PacmanInterface::writeCPU8(uint16_t addr, uint8_t data)
     {
-	addr &= 0x7FFF;
-
-	if (addr < 0x4000)
-	{
-	    return;
-	}
-	else if (addr < 0x4400)
-	{
-	    vram[(addr & 0x3FF)] = data;
-	}
-	else if (addr < 0x4800)
-	{
-	    cram[(addr & 0x3FF)] = data;
-	}
-	else if (addr < 0x4C00)
-	{
-	    return;
-	}
-	else if (addr < 0x4FF0)
-	{
-	    mainram[(addr & 0x3FF)] = data;
-	}
-	else if (addr < 0x5000)
-	{
-	    oam[(addr & 0xF)] = data;
-	}
-	else if (addr < 0x5040)
-	{
-	    writeIO((addr & 7), data);
-	}
-	else if (addr < 0x5060)
-	{
-	    pac_sound.writereg((addr - 0x5040), data);
-	}
-	else if (addr < 0x5070)
-	{
-	    sprite_pos[(addr & 0xF)] = data;
-	}
-	else if (addr < 0x50C0)
-	{
-	    return;
-	}
-	else
-	{
-	    // Watchdog timer (currently unimplemented)
-	    return;
-	}
+	writeByte(addr, data);
     }
 
     uint8_t PacmanInterface::readOp8(uint16_t addr)
@@ -171,297 +143,189 @@ namespace berrn
 	return readByte(addr);
     }
 
+    void PacmanInterface::portOut(uint16_t port, uint8_t data)
+    {
+	writePort(port, data);
+    }
+
     uint8_t PacmanInterface::readByte(uint16_t addr)
     {
 	addr &= 0x7FFF;
-
 	uint8_t data = 0;
 
 	if (addr < 0x4000)
 	{
-	    data = gamerom[addr];
-	}
-	else if (addr < 0x4400)
-	{
-	    data = vram[(addr & 0x3FF)];
-	}
-	else if (addr < 0x4800)
-	{
-	    data = cram[(addr & 0x3FF)];
-	}
-	else if (addr < 0x4C00)
-	{
-	    data = 0x00;
-	}
-	else if (addr < 0x4FF0)
-	{
-	    data = mainram[(addr & 0x3FF)];
-	}
-	else if (addr < 0x5000)
-	{
-	    data = oam[(addr & 0xF)];
-	}
-	else if (addr < 0x5040)
-	{
-	    data = in0_val;
-	}
-	else if (addr < 0x5080)
-	{
-	    data = in1_val;
-	}
-	else if (addr < 0x50C0)
-	{
-	    // Reading IN2
-	    data = 0xC9;
+	    data = game_rom.at(addr);
 	}
 	else
 	{
-	    cout << "Reading from address of " << hex << int(addr) << endl;
-	    exit(0);
+	    data = readUpper(addr);
 	}
 
 	return data;
     }
 
-    void PacmanInterface::writeIO(int addr, uint8_t data)
+    void PacmanInterface::writeByte(uint16_t addr, uint8_t data)
     {
-	switch (addr)
-	{
-	    case 0: vblank_enable = testbit(data, 0); break;
-	    case 1: sound_enable = testbit(data, 0); break;
-	    case 3: flip_screen = testbit(data, 0); break;
-	}
-    }
+	addr &= 0x7FFF;
 
-    void PacmanInterface::portOut(uint16_t port, uint8_t data)
-    {
-	if ((port & 0xFF) == 0)
+	if (addr < 0x4000)
 	{
-	    int_vector = data;
+	    return;
 	}
 	else
 	{
-	    BerrnInterface::portOut(port, data);
+	    writeUpper(addr, data);
 	}
     }
 
-    void PacmanInterface::set_pixel(int xpos, int ypos, uint8_t color_num)
+    uint8_t PacmanInterface::readUpper(uint16_t addr)
     {
-	if (!inRange(xpos, 0, 224) || !inRange(ypos, 0, 288))
+	uint8_t data = 0;
+	addr &= 0x5FFF;
+
+	uint16_t addr_io = (addr & 0x50FF);
+
+	if (inRange(addr, 0x4000, 0x4800))
+	{
+	    data = video_core->readByte(addr);
+	}
+	else if (inRange(addr, 0x4800, 0x4C00))
+	{
+	    // Return value of reading the bus with no devices enabled
+	    // (value derived from MAME sources)
+	    data = 0xBF;
+	}
+	else if (inRange(addr, 0x4C00, 0x4FF0))
+	{
+	    data = ram[(addr & 0x3FF)];
+	}
+	else if (inRange(addr, 0x4FF0, 0x5000))
+	{
+	    data = video_core->readSprites(addr);
+	}
+	else if (inRange(addr_io, 0x5000, 0x5040))
+	{
+	    // TODO: Port 0 reads
+	    data = 0xFF;
+	}
+	else if (inRange(addr_io, 0x5040, 0x5080))
+	{
+	    // TODO: Port 1 reads
+	    data = 0xFF;
+	}
+	else if (inRange(addr_io, 0x5080, 0x50C0))
+	{
+	    data = 0xC9;
+	}
+	else
+	{
+	    cout << "Reading byte from address of " << hex << int(addr) << endl;
+	    exit(0);
+	    data = 0;
+	}
+
+	return data;
+    }
+
+    void PacmanInterface::writeUpper(uint16_t addr, uint8_t data)
+    {
+	addr &= 0x5FFF;
+
+	uint16_t addr_io = (addr & 0x50FF);
+
+	if (inRange(addr, 0x4000, 0x4800))
+	{
+	    video_core->writeByte(addr, data);
+	}
+	else if (inRange(addr, 0x4800, 0x4C00))
 	{
 	    return;
 	}
-
-	uint8_t color = color_rom[color_num];
-
-	bool red0 = testbit(color, 0);
-	bool red1 = testbit(color, 1);
-	bool red2 = testbit(color, 2);
-
-	bool green0 = testbit(color, 3);
-	bool green1 = testbit(color, 4);
-	bool green2 = testbit(color, 5);
-
-	bool blue0 = testbit(color, 6);
-	bool blue1 = testbit(color, 7);
-
-	int red = ((red0 * 0x21) + (red1 * 0x47) + (red2 * 0x97));
-	int green = ((green0 * 0x21) + (green1 * 0x47) + (green2 * 0x97));
-	int blue = ((blue0 * 0x51) + (blue1 * 0xAE));
-
-	berrnRGBA pixel_color = fromRGB(red, green, blue);
-	int screen_index = (xpos + (ypos * 224));
-	framebuffer.at(screen_index) = pixel_color;
-    }
-
-    void PacmanInterface::draw_tile(uint8_t tile_num, array<uint8_t, 4> palette, int xcoord, int ycoord)
-    {
-	int base_x = ((xcoord - 2) * 8);
-	int base_y = (ycoord * 8);
-
-	if (!inRange(base_x, 0, 224))
+	else if (inRange(addr, 0x4C00, 0x4FF0))
+	{
+	    ram[(addr & 0x3FF)] = data;
+	}
+	else if (inRange(addr, 0x4FF0, 0x5000))
+	{
+	    video_core->writeSprites(addr, data);
+	}
+	else if (inRange(addr_io, 0x5000, 0x5040))
+	{
+	    writeIO(addr_io, data);
+	}
+	else if (inRange(addr_io, 0x5040, 0x5060))
+	{
+	    cout << "Writing value of " << hex << int(data) << " to Namco sound device address of " << hex << int((addr_io & 0x1F)) << endl;
+	}
+	else if (inRange(addr_io, 0x5060, 0x5070))
+	{
+	    video_core->writeSpritePos(addr, data);
+	}
+	else if (inRange(addr_io, 0x5070, 0x50C0))
 	{
 	    return;
 	}
-
-	for (int pixel = 0; pixel < 64; pixel++)
+	else if (inRange(addr_io, 0x50C0, 0x5100))
 	{
-	    int py = (pixel / 8);
-	    int px = (pixel % 8);
-
-	    uint8_t color_num = tile_ram[((tile_num * 64) + pixel)];
-	    int xpos = (base_x + px);
-	    int ypos = (base_y + py);
-	    set_pixel(xpos, ypos, palette[color_num]);
-	}
-    }
-
-    void PacmanInterface::draw_sprite(uint8_t sprite_num, array<uint8_t, 4> palette, int xcoord, int ycoord, bool flipx, bool flipy)
-    {
-	if (!inRange(xcoord, -16, 224))
-	{
+	    // Watchdog timer (unimplemented)
 	    return;
 	}
-
-	int base_x = xcoord;
-	int base_y = ycoord;
-
-	for (int pixel = 0; pixel < (16 * 16); pixel++)
+	else
 	{
-	    int px = (pixel % 16);
-	    int py = (pixel / 16);
+	    cout << "Writing byte of " << hex << int(data) << " to address of " << hex << int(addr) << endl;
+	    exit(0);
+	}
+    }
 
-	    if (flipx)
+    void PacmanInterface::writeIO(int addr, uint8_t data)
+    {
+	addr &= 7;
+
+	bool val = testbit(data, 0);
+
+	switch (addr)
+	{
+	    case 0:
 	    {
-		px = (15 - px);
-	    }
+		is_irq_enabled = val;
 
-	    if (flipy)
+		if (!val)
+		{
+		    main_proc->fire_interrupt8(irq_vector, false);
+		}
+	    }
+	    break;
+	    case 1:
 	    {
-		py = (15 - py);
+		if (val)
+		{
+		    cout << "Sound enabled" << endl;
+		}
+		else
+		{
+		    cout << "Sound disabled" << endl;
+		}
 	    }
-
-	    int xpos = (base_x + px);
-	    int ypos = (base_y + py);
-
-	    if (!inRange(xpos, 0, 224))
-	    {
-		continue;
-	    }
-
-	    uint8_t color_num = sprite_ram[((sprite_num * 256) + pixel)];
-
-	    if (palette[color_num] == 0)
-	    {
-		continue;
-	    }
-
-	    set_pixel(xpos, ypos, palette[color_num]);
+	    break;
+	    default: break;
 	}
     }
 
-    array<uint8_t, 4> PacmanInterface::get_palette(int pal_num)
+    void PacmanInterface::writePort(uint16_t port, uint8_t data)
     {
-	array<uint8_t, 4> palette;
-	int pal_offs = ((pal_num & 0x3F) * 4);
+	port &= 0xFF;
 
-	for (int i = 0; i < 4; i++)
+	if (port == 0)
 	{
-	    palette[i] = pal_rom.at((pal_offs + i));
+	    main_proc->set_irq_vector(data);
+	    irq_vector = data;
 	}
-
-	return palette;
-    }
-
-    void PacmanInterface::updatePixels()
-    {
-	for (int addr = 0; addr < 64; addr++)
-	{
-	    int ypos = (34 + (addr / 32));
-	    int xpos = (31 - (addr % 32));
-
-	    uint8_t tile_num = vram[addr];
-	    uint8_t pal_num = cram[addr];
-
-	    auto palette = get_palette(pal_num);
-	    draw_tile(tile_num, palette, xpos, ypos);
-	}
-
-	for (int addr = 0; addr < 0x380; addr++)
-	{
-	    int ypos = (2 + (addr % 32));
-	    int xpos = (29 - (addr / 32));
-
-	    uint8_t tile_num = vram[(64 + addr)];
-	    uint8_t pal_num = cram[(64 + addr)];
-
-	    auto palette = get_palette(pal_num);
-	    draw_tile(tile_num, palette, xpos, ypos);
-	}
-
-	for (int addr = 0; addr < 64; addr++)
-	{
-	    int ypos = (addr / 32);
-	    int xpos = (31 - (addr % 32));
-
-	    uint8_t tile_num = vram[(0x3C0 + addr)];
-	    uint8_t pal_num = cram[(0x3C0 + addr)];
-
-	    auto palette = get_palette(pal_num);
-	    draw_tile(tile_num, palette, xpos, ypos);
-	}
-
-	for (int sprite = 7; sprite >= 0; sprite--)
-	{
-	    int16_t xpos = (224 - sprite_pos[(sprite * 2)] + 15);
-	    int16_t ypos = (288 - sprite_pos[((sprite * 2) + 1)] - 16);
-
-	    uint8_t sprite_info = oam[(sprite * 2)];
-	    uint8_t pal_num = oam[((sprite * 2) + 1)];
-
-	    bool xflip = testbit(sprite_info, 1);
-	    bool yflip = testbit(sprite_info, 0);
-	    uint8_t sprite_num = (sprite_info >> 2);
-
-	    auto palette = get_palette(pal_num);
-	    draw_sprite(sprite_num, palette, xpos, ypos, xflip, yflip);
-	}
-    }
-
-    void PacmanInterface::coin(bool is_pressed)
-    {
-	in0_val = changebit(in0_val, 5, !is_pressed);
-    }
-
-    void PacmanInterface::p1up(bool is_pressed)
-    {
-	in0_val = changebit(in0_val, 0, !is_pressed);
-    }
-
-    void PacmanInterface::p1left(bool is_pressed)
-    {
-	in0_val = changebit(in0_val, 1, !is_pressed);
-    }
-
-    void PacmanInterface::p1right(bool is_pressed)
-    {
-	in0_val = changebit(in0_val, 2, !is_pressed);
-    }
-
-    void PacmanInterface::p1down(bool is_pressed)
-    {
-	in0_val = changebit(in0_val, 3, !is_pressed);
-    }
-
-    void PacmanInterface::p1start(bool is_pressed)
-    {
-	in1_val = changebit(in1_val, 5, !is_pressed);
     }
 
     driverpacman::driverpacman()
     {
-	pacman_proc = new BerrnZ80Processor(3072000, inter);
-	pacman_cpu = new BerrnCPU(scheduler, *pacman_proc);
-
-	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t param, int64_t) {
-	    if (param == 1)
-	    {
-		vblank_timer->start(time_in_hz(60), true);
-	    }
-
-	    inter.updatePixels();
-	});
-
-	interrupt_timer = new BerrnTimer("Interrupt", scheduler, [&](int64_t, int64_t) {
-	    this->interrupt_handler();
-	});
-
-	sound_timer = new BerrnTimer("Sound", scheduler, [&](int64_t, int64_t) {
-	    if (inter.is_sound_enabled())
-	    {
-		this->sound_clock();
-	    }
-	});
+	inter = new PacmanInterface(*this);
     }
 
     driverpacman::~driverpacman()
@@ -479,121 +343,33 @@ namespace berrn
 	return true;
     }
 
-    void driverpacman::loadROMs()
-    {
-	loadROM("pacman.6e", 0x0000, 0x1000, inter.get_gamerom());
-	loadROM("pacman.6f", 0x1000, 0x1000, inter.get_gamerom());
-	loadROM("pacman.6h", 0x2000, 0x1000, inter.get_gamerom());
-	loadROM("pacman.6j", 0x3000, 0x1000, inter.get_gamerom());
-	loadROM("82s123.7f", 0x0000, 0x0020, inter.get_color_rom());
-	loadROM("82s126.4a", 0x0000, 0x0100, inter.get_pal_rom());
-	loadROM("pacman.5e", 0x0000, 0x1000, inter.get_tile_rom());
-	loadROM("pacman.5f", 0x0000, 0x1000, inter.get_sprite_rom());
-	loadROM("82s126.1m", 0x0000, 0x0100, inter.get_sound_rom());
-	loadROM("82s126.3m", 0x0100, 0x0100, inter.get_sound_rom());
-    }
-
-    void driverpacman::interrupt_handler()
-    {
-	if (inter.is_vblank_enabled())
-	{
-	    pacman_proc->fire_interrupt8(inter.get_int_vec());
-	}
-    }
-
-    void driverpacman::sound_clock()
-    {
-	while (out_step > out_time)
-	{
-	    inter.clock_wsg3();
-	    out_time += in_step;
-	}
-
-	out_time -= out_step;
-	auto sample = inter.get_wsg3_sample();
-	mixSample(sample);
-	outputAudio();
-    }
-
     bool driverpacman::drvinit()
     {
-	int64_t frame_time = time_in_hz(60);
-	out_step = inter.get_wsg3_sample_rate();
-	in_step = getSampleRate();
-	out_time = 0.0f;
-	loadROMs();
-	scheduler.reset();
-	scheduler.add_device(pacman_cpu);
-	interrupt_timer->start(frame_time, true);
-	vblank_timer->start((frame_time - 2500), false, 1);
-	sound_timer->start(time_in_hz(getSampleRate()), true);
-	pacman_proc->init();
-	inter.init();
-	resize(224, 288, 2);
-	return isallfilesloaded();
+	if (!loadROM(berrn_rom_name(pacman)))
+	{
+	    return false;
+	}
+
+	return inter->init_core();
     }
 
     void driverpacman::drvshutdown()
     {
-	sound_timer->stop();
-	vblank_timer->stop();
-	inter.shutdown();
-	pacman_proc->shutdown();
-	scheduler.remove_timer(sound_timer);
-	scheduler.remove_timer(vblank_timer);
-	scheduler.remove_timer(interrupt_timer);
-	scheduler.remove_device(pacman_cpu);
+	inter->shutdown_core();
     }
   
     void driverpacman::drvrun()
     {
-	int64_t schedule_time = scheduler.get_current_time();
+	inter->run_core();
+    }
 
-	int64_t frame_time = time_in_hz(60);
-
-	while (scheduler.get_current_time() < (schedule_time + frame_time))
-	{
-	    scheduler.timeslice();
-	}
-
-	filltexrect(0, 0, 224, 288, inter.get_framebuffer());
+    float driverpacman::get_framerate()
+    {
+	return (16000.0 / 132.0 / 2.0); // Framerate is 60.606060 Hz
     }
 
     void driverpacman::keychanged(BerrnInput key, bool is_pressed)
     {
-	switch (key)
-	{
-	    case BerrnInput::BerrnCoin:
-	    {
-		inter.coin(is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnStartP1:
-	    {
-		inter.p1start(is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnUpP1:
-	    {
-		inter.p1up(is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnDownP1:
-	    {
-		inter.p1down(is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnLeftP1:
-	    {
-		inter.p1left(is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnRightP1:
-	    {
-		inter.p1right(is_pressed);
-	    }
-	    break;
-	    default: break;
-	}
+	inter->key_changed(key, is_pressed);
     }
 };

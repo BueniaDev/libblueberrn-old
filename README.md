@@ -12,7 +12,7 @@ As of this time, libblueberrn is not able to run most commercial arcade ROMs, th
 
 # Building Instructions
 
-The libblueberrn library does not have any external dependencies and can be compiled with MinGW on Windows, and both GCC and (presumably) Clang on Linux, as well as AppleClang on Mac OS. The examples contained in this repo, however, do have additional dependencies that need to be installed. All dependencies should be findable by CMake.
+The libblueberrn library does not have any external dependencies and can be compiled with MinGW or Clang on Windows, GCC or Clang on Linux, and (presumably) AppleClang on Mac OS. The examples contained in this repo, however, do have additional dependencies that need to be installed. All dependencies should be findable by CMake.
 
 ## Linux:
 
@@ -32,17 +32,17 @@ Fedora (not tested): `sudo dnf install gcc-c++`
 
 OpenSUSE (not tested): `sudo zypper in gcc-c++`
 
-Clang (not tested):
+Clang:
 
 Debian: `sudo apt-get install clang clang-format libc++-dev` (in some distros, clang-5.0)
 
-Arch: `pacman -S clang`, `libc++` is in the AUR. Use pacaur or yaourt to install it.
+Arch (not tested): `pacman -S clang`, `libc++` is in the AUR. Use pacaur or yaourt to install it.
 
-Fedora: `dnf install clang libcxx-devel`
+Fedora (not tested): `dnf install clang libcxx-devel`
 
-OpenSUSE: `zypper in clang`
+OpenSUSE (not tested): `zypper in clang`
 
-Git (if not installed already) and CMake 3.5+:
+Git (if not installed already) and CMake 3.13+:
 
 Debian: `sudo apt-get install git cmake`
 
@@ -77,7 +77,7 @@ cmake .. -G "Unix Makefiles" -DBUILD_EXAMPLE="<ON/OFF>" -DCMAKE_BUILD_TYPE="<Deb
 make -j$(nproc --all)
 ```
 
-## Mac OS (not thoroughly tested):
+## Mac OS (not tested):
 
 You will need [homebrew](https://brew.sh), a recent version of Xcode and the Xcode command-line tools to build libblueberrn.
 Please note that due to personal financial constraints, libblueberrn has not been thoroughly tested on Mac OS as of yet.
@@ -153,17 +153,19 @@ Improve Namco Galaxian hardware support
 
 Improve Namco Pacman hardware support
 
-Capcom Mitchell hardware support
+Improve Sega System 1 hardware support
+
+Improve Namco Galaga hardware support
+
+Taito 68k hardware support
 
 ## Medium-term
 
-Sega System 1 hardware support
-
 Sega System 16 hardware support
 
-Namco Galaga hardware support
-
 Capcom CPS-1 support
+
+Capcom Mitchell hardware support
 
 ## Long-term
 

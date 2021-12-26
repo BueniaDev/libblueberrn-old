@@ -16,38 +16,51 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef LIBBLUEBERRN_GALAXIAN_VIDEO_H
-#define LIBBLUEBERRN_GALAXIAN_VIDEO_H
+#ifndef BERRN_UTILS_H
+#define BERRN_UTILS_H
 
 #include <cstdint>
-#include <iostream>
 using namespace std;
 
-namespace galaxianvid
+namespace berrn
 {
-    class galaxianvideo
+    template<typename T>
+    bool testbit(T reg, int bit)
     {
-	public:
-	    galaxianvideo()
-	    {
+	return ((reg >> bit) & 1) ? true : false;
+    }
 
-	    }
+    template<typename T>
+    T setbit(T reg, int bit)
+    {
+	return (reg | (1 << bit));
+    }
 
-	    ~galaxianvideo()
-	    {
+    template<typename T>
+    T resetbit(T reg, int bit)
+    {
+	return (reg & ~(1 << bit));
+    }
 
-	    }
+    template<typename T>
+    T changebit(T reg, int bit, bool val)
+    {
+	if (val == true)
+	{
+	    return setbit(reg, bit);
+	}
+	else
+	{
+	    return resetbit(reg, bit);
+	}
+    }
 
-	    void init()
-	    {
-		return;
-	    }
-
-	    void shutdown()
-	    {
-		return;
-	    }
-    };
+    template<typename T>
+    bool inRange(T value, int low, int high)
+    {
+	int val = int(value);
+	return ((val >= low) && (val < high));
+    }
 };
 
-#endif // LIBBLUEBERRN_GALAXIAN_VIDEO_H
+#endif // BERRN_UTILS_H
