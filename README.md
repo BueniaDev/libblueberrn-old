@@ -1,5 +1,8 @@
 <img src="https://github.com/BueniaDev/libblueberrn/blob/main/res/logo.png" alt="drawing" width="300"/>
 
+[![CircleCI](https://circleci.com/gh/BueniaDev/libblueberrn.svg?style=svg)]
+(https://circleci.com/gh/BueniaDev/libblueberrn)
+
 Arcade machine emulation library, sorta
 
 The goal here is to help preserve the arcade machines of our past. But, also, you know, to have a fun challenge... :)
