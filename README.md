@@ -1,7 +1,6 @@
 <img src="https://github.com/BueniaDev/libblueberrn/blob/main/res/logo.png" alt="drawing" width="300"/>
 
-[![CircleCI](https://circleci.com/gh/BueniaDev/libblueberrn.svg?style=svg)]
-(https://circleci.com/gh/BueniaDev/libblueberrn)
+[![CircleCI](https://circleci.com/gh/BueniaDev/libblueberrn.svg?style=svg)](https://circleci.com/gh/BueniaDev/libblueberrn)
 
 Arcade machine emulation library, sorta
 
@@ -189,7 +188,7 @@ libblueberrn is free software: you can redistribute it and/or modify it under th
 
 # Copyright
 
-(C) 2021 BueniaDev. This project is not affiliated in any way with Taito, Namco, Midway, or any of the manufacturers of the arcade machines supported in this project. All arcade games and their logos/brandings featured herein are the registered trademarks of their respective owners.
+(C) 2022 BueniaDev. This project is not affiliated in any way with Taito, Namco, Midway, or any of the manufacturers of the arcade machines supported in this project. All arcade games and their logos/brandings featured herein are the registered trademarks of their respective owners.
 
 All copyrighted material in this repository belongs to their respective owners, and is used under the terms of the "fair use" clause of U.S. and international copyright law. For more information, see the "res/fairuse.txt" file in this repository.
 
