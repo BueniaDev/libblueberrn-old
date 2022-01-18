@@ -1,4 +1,4 @@
-<img src="https://github.com/BueniaDev/libblueberrn/blob/main/res/logo.png" alt="drawing" width="300"/>
+<img src="https://github.com/BueniaDev/libblueberrn/blob/main/res/logo.bmp" alt="drawing" width="300"/>
 
 [![CircleCI](https://circleci.com/gh/BueniaDev/libblueberrn.svg?style=svg)](https://circleci.com/gh/BueniaDev/libblueberrn)
 
@@ -8,7 +8,7 @@ The goal here is to help preserve the arcade machines of our past. But, also, yo
 
 # Current Status
 
-As of this time, libblueberrn is not able to run most commercial arcade ROMs, though some ROMs are beginning to boot. Please see the compatibility database for more details.
+As of this time, libblueberrn is already capable of playing a few commercial arcade ROMs, and more ROMs are beginning to boot. Please see the compatibility database for more details.
 
 [Link to compatibility database](https://github.com/BueniaDev/libblueberrn-compatibility)
 

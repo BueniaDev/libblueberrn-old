@@ -16,8 +16,8 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef BERRN_PACMAN_VIDEO_H
-#define BERRN_PACMAN_VIDEO_H
+#ifndef BERRN_1942_VIDEO_H
+#define BERRN_1942_VIDEO_H
 
 #include <libblueberrn_api.h>
 #include <utils.h>
@@ -28,11 +28,11 @@ using namespace std;
 
 namespace berrn
 {
-    class pacmanvideo
+    class berrn1942video
     {
 	public:
-	    pacmanvideo(berrndriver &drv);
-	    ~pacmanvideo();
+	    berrn1942video(berrndriver &drv);
+	    ~berrn1942video();
 
 	    bool init();
 	    void shutdown();
@@ -40,42 +40,45 @@ namespace berrn
 	    uint8_t readByte(uint16_t addr);
 	    void writeByte(uint16_t addr, uint8_t data);
 
-	    uint8_t readSprites(int addr);
-	    void writeSprites(int addr, uint8_t data);
+	    uint8_t readSprites(uint16_t addr);
+	    void writeSprites(uint16_t addr, uint8_t data);
 
-	    void writeSpritePos(int addr, uint8_t data);
+	    void setScroll(bool is_msb, uint8_t data);
+	    void setPaletteBank(uint8_t data);
 
-	    void updatePixels();
-
-	    BerrnBitmapRGB *get_bitmap()
-	    {
-		return bitmap;
-	    }
+	    void update_pixels();
 
 	private:
 	    berrndriver &driver;
-
 	    BerrnBitmapRGB *bitmap = NULL;
 
-	    array<uint8_t, 0x400> vram;
-	    array<uint8_t, 0x400> cram;
-	    array<uint8_t, 0x10> obj_ram;
-	    array<uint8_t, 0x10> obj_pos;
+	    array<uint8_t, 0x800> fg_vram;
+	    array<uint8_t, 0x400> bg_vram;
+	    array<uint8_t, 0x80> sprite_ram;
 
-	    vector<uint8_t> pal_rom;
-	    vector<uint8_t> col_rom;
-	    vector<uint8_t> tile_rom;
-	    vector<uint8_t> sprite_rom;
+	    void init_palette();
 
-	    vector<uint8_t> tile_ram;
-	    vector<uint8_t> sprite_ram;
+	    int palette_bank = 0;
 
-	    void update_tiles();
-	    void update_sprites();
-	    void draw_tile(int tile_num, int pal_num, int xcoord, int ycoord);
-	    void draw_sprite(int sprite_num, int pal_num, int xcoord, int ycoord, bool flipx, bool flipy);
-	    void set_pixel(int xpos, int ypos, uint8_t color_num);
+	    vector<uint8_t> bg_rom;
+	    vector<uint8_t> fg_rom;
+
+	    array<uint8_t, 256> fg_pal;
+	    array<array<uint8_t, 256>, 4> bg_pal;
+
+	    array<berrnRGBA, 256> colors;
+
+	    vector<uint8_t> bg_ram;
+	    vector<uint8_t> fg_ram;
+
+	    void update_background();
+	    void update_foreground();
+
+	    uint16_t scroll_x = 0;
+
+	    void draw_bg_tile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord, bool xflip, bool yflip);
+	    void draw_fg_tile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord);
     };
 };
 
-#endif // BERRN_PACMAN_VIDEO_H
+#endif // BERRN_1942_VIDEO_H

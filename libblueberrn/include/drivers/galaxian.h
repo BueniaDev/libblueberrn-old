@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -71,6 +71,9 @@ namespace berrn
 	    array<uint8_t, 0x400> ram;
 
 	    bool is_int_enabled = false;
+
+	    uint8_t port0_val = 0;
+	    uint8_t port1_val = 0;
     };
 
     class LIBBLUEBERRN_API drivergalaxian : public berrndriver

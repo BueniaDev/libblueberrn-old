@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ namespace berrn
 	    berrn_rom_load("pacman.5e", 0x0000, 0x1000)
 	berrn_rom_region("gfx2", 0x1000)
 	    berrn_rom_load("pacman.5f", 0x0000, 0x1000)
-	berrn_rom_region("sound", 0x0200)
+	berrn_rom_region("namco", 0x0200)
 	    berrn_rom_load("82s126.1m", 0x0000, 0x0100)
 	    berrn_rom_load("82s126.3m", 0x0100, 0x0100)
     berrn_rom_end
@@ -46,6 +46,8 @@ namespace berrn
 
 	main_proc = new BerrnZ80Processor(3072000, *this);
 	main_cpu = new BerrnCPU(scheduler, *main_proc);
+
+	audio_chip = new wsg3device(driver);
 
 	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
 	{
@@ -64,6 +66,13 @@ namespace berrn
 		main_proc->fire_interrupt8(irq_vector);
 	    }
 	});
+
+	sound_timer = new BerrnTimer("Sound", scheduler, [&](int64_t, int64_t)
+	{
+	    auto samples = audio_chip->fetch_samples();
+	    driver.addMonoSample(samples[0]);
+	    driver.outputAudio();
+	});
     }
 
     PacmanInterface::~PacmanInterface()
@@ -78,8 +87,12 @@ namespace berrn
 	main_proc->init();
 	video_core->init();
 
+	port0_val = 0xFF;
+	port1_val = 0xFF;
+
 	vblank_timer->start(16500, true);
 	interrupt_timer->start(14000, false, 1);
+	sound_timer->start(time_in_hz(driver.getSampleRate()), true);
 
 	for (int i = 0; i < 8; i++)
 	{
@@ -90,19 +103,20 @@ namespace berrn
 
 	driver.resize(224, 288, 2);
 	game_rom = driver.get_rom_region("cpu");
+	audio_chip->init();
+	audio_chip->set_sample_rates(96000, driver.getSampleRate());
 	return true;
     }
 
     void PacmanInterface::shutdown_core()
     {
+	audio_chip->shutdown();
 	video_core->shutdown();
 	main_proc->shutdown();
 	interrupt_timer->stop();
 	vblank_timer->stop();
-
-	scheduler.remove_timer(interrupt_timer);
-	scheduler.remove_timer(vblank_timer);
-	scheduler.remove_device(main_cpu);
+	sound_timer->stop();
+	scheduler.shutdown();
     }
 
     void PacmanInterface::run_core()
@@ -119,13 +133,45 @@ namespace berrn
 
     void PacmanInterface::key_changed(BerrnInput key, bool is_pressed)
     {
-
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		port0_val = changebit(port0_val, 5, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		port1_val = changebit(port1_val, 5, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnUpP1:
+	    {
+		port0_val = changebit(port0_val, 0, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		port0_val = changebit(port0_val, 1, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		port0_val = changebit(port0_val, 2, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnDownP1:
+	    {
+		port0_val = changebit(port0_val, 3, !is_pressed);
+	    }
+	    break;
+	    default: break;
+	}
     }
 
     void PacmanInterface::update_pixels()
     {
 	video_core->updatePixels();
-	driver.setScreen(video_core->get_bitmap());
     }
 
     uint8_t PacmanInterface::readCPU8(uint16_t addr)
@@ -206,16 +252,42 @@ namespace berrn
 	}
 	else if (inRange(addr_io, 0x5000, 0x5040))
 	{
-	    // TODO: Port 0 reads
-	    data = 0xFF;
+	    data = port0_val;
 	}
 	else if (inRange(addr_io, 0x5040, 0x5080))
 	{
-	    // TODO: Port 1 reads
-	    data = 0xFF;
+	    data = port1_val;
 	}
 	else if (inRange(addr_io, 0x5080, 0x50C0))
 	{
+	    // IN2 port values
+	    //
+	    // Bits 0-1 - Number of credits per game
+	    // 0 = None (free play)
+	    // 1 = 1 credit per game
+	    // 2 = 1 credit per 2 games
+	    // 3 = 2 credits per game
+	    //
+	    // Bits 2-3 - Number of lives per game:
+	    // 0 = 1 life
+	    // 1 = 2 lives
+	    // 2 = 3 lives
+	    // 3 = 5 lives
+	    //
+	    // Bits 4-5 - Bonus life at:
+	    // 0 = 10000 points
+	    // 1 = 15000 points
+	    // 2 = 20000 points
+	    // 3 = N/A
+	    //
+	    // Bit 6 - Difficulty:
+	    // 0 = Hard
+	    // 1 = Normal
+	    //
+	    // Bit 7 - Ghost names:
+	    // 0 = Alternate (BBBBBBBB, DDDDDDDD, FFFFFFFF, and HHHHHHHH)
+	    // 1 = Normal (Blinky, Pinky, Inky, and Clyde)
+
 	    data = 0xC9;
 	}
 	else
@@ -256,7 +328,7 @@ namespace berrn
 	}
 	else if (inRange(addr_io, 0x5040, 0x5060))
 	{
-	    cout << "Writing value of " << hex << int(data) << " to Namco sound device address of " << hex << int((addr_io & 0x1F)) << endl;
+	    audio_chip->write_reg((addr_io & 0x1F), data);
 	}
 	else if (inRange(addr_io, 0x5060, 0x5070))
 	{
@@ -298,14 +370,7 @@ namespace berrn
 	    break;
 	    case 1:
 	    {
-		if (val)
-		{
-		    cout << "Sound enabled" << endl;
-		}
-		else
-		{
-		    cout << "Sound disabled" << endl;
-		}
+		audio_chip->set_sound_enabled(val);
 	    }
 	    break;
 	    default: break;

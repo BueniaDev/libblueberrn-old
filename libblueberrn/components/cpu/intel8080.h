@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -98,7 +98,7 @@ class Berrn8080Processor : public BerrnProcessor
 	int64_t get_exec_time()
 	{
 	    int64_t cycles = (current_cycles - cycles_left);
-	    return static_cast<int64_t>(1e6 * cycles / clock_freq);
+	    return static_cast<int64_t>((1e6 * cycles / clock_freq) + 0.5);
 	}
 
 	int64_t execute(int64_t us)

@@ -319,6 +319,8 @@ namespace berrn
 	    int color = (obj_ram.at(sprite_offs + 2) & 0x7);
 	    draw_sprite(sprite_num, xpos, ypos, is_xflip, is_yflip, color);
 	}
+
+	driver.setScreen(bitmap);
     }
 
     uint8_t galaxianvideo::readByte(uint16_t addr)

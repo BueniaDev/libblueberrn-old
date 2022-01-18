@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -124,7 +124,7 @@ class BerrnZ80Processor : public BerrnProcessor
 	int64_t get_exec_time()
 	{
 	    int64_t cycles = (current_cycles - cycles_left);
-	    return static_cast<int64_t>(1e6 * cycles / clock_freq);
+	    return static_cast<int64_t>((1e6 * cycles / clock_freq) + 0.5);
 	}
 
 	int64_t execute(int64_t us)
@@ -135,6 +135,8 @@ class BerrnZ80Processor : public BerrnProcessor
 	    {
 		return us;
 	    }
+
+	    // cout << "Running Z80 for " << dec << us << " microseconds" << endl;
 
 	    current_cycles = static_cast<int64_t>(clock_freq * us / 1e6);
 	    cycles_left = current_cycles;
@@ -150,7 +152,7 @@ class BerrnZ80Processor : public BerrnProcessor
 		    cycles_left -= core.runinstruction();
 		}
 	    }
-
+	    
 	    return get_exec_time();
 	}
 
@@ -164,6 +166,12 @@ class BerrnZ80Processor : public BerrnProcessor
 	    is_halted = is_halting;
 	}
 
+	void debug_output()
+	{
+	    cout << "Z80 output: " << endl;
+	    core.debugoutput();
+	}
+
     private:
 	uint64_t clock_freq = 0;
 	BerrnZ80Interface *procinter = NULL;
@@ -173,6 +181,7 @@ class BerrnZ80Processor : public BerrnProcessor
 	int64_t cycles_left = 0;
 	bool is_stopped = true;
 	bool is_halted = false;
+	bool dump = false;
 
 	bool is_irq_line = false;
 };

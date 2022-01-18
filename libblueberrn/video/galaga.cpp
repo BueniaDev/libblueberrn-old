@@ -16,7 +16,7 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "pacman.h"
+#include "galaga.h"
 using namespace berrn;
 using namespace std;
 
@@ -33,60 +33,119 @@ namespace berrn
 	128
     };
 
-    static BerrnGfxLayout spritelayout = 
+    static BerrnGfxLayout spritelayout =
     {
 	16, 16,
-	64,
+	128,
 	2,
 	{0, 4},
-	{ gfx_step4(64, 1), gfx_step4(128, 1), gfx_step4(192, 1), gfx_step4(0, 1) },
+	{ gfx_step4(0, 1), gfx_step4(64, 1), gfx_step4(128, 1), gfx_step4(192, 1) },
 	{ gfx_step8(0, 8), gfx_step8(256, 8) },
 	512
     };
 
-    pacmanvideo::pacmanvideo(berrndriver &drv) : driver(drv)
+    galagavideo::galagavideo(berrndriver &drv) : driver(drv)
     {
 	bitmap = new BerrnBitmapRGB(224, 288);
 	bitmap->clear();
     }
 
-    pacmanvideo::~pacmanvideo()
+    galagavideo::~galagavideo()
     {
 
     }
 
-    bool pacmanvideo::init()
+    bool galagavideo::init()
     {
 	col_rom = driver.get_rom_region("color");
-	pal_rom = driver.get_rom_region("pal");
+	tile_pal_rom = driver.get_rom_region("tilepal");
+	sprite_pal_rom = driver.get_rom_region("spritepal");
+
+	obj_ram.fill(0);
+	obj_ram2.fill(0);
+	obj_ram3.fill(0);
+
 	tile_rom = driver.get_rom_region("gfx1");
 	sprite_rom = driver.get_rom_region("gfx2");
+
 	tile_ram.resize((256 * 8 * 8), 0);
-	sprite_ram.resize((64 * 16 * 16), 0);
+	sprite_ram.resize((128 * 16 * 16), 0);
 
 	gfxDecodeSet(charlayout, tile_rom, tile_ram);
 	gfxDecodeSet(spritelayout, sprite_rom, sprite_ram);
 
 	vram.fill(0);
 	cram.fill(0);
-	obj_ram.fill(0);
-	obj_pos.fill(0);
 	return true;
     }
 
-    void pacmanvideo::shutdown()
+    void galagavideo::shutdown()
     {
+	tile_ram.clear();
+	sprite_ram.clear();
 	bitmap->clear();
     }
 
-    void pacmanvideo::updatePixels()
+    void galagavideo::updatePixels()
     {
-	update_tiles();
+	bitmap->fillcolor(black());
 	update_sprites();
+	update_tiles();
 	driver.setScreen(bitmap);
     }
 
-    void pacmanvideo::update_tiles()
+    void galagavideo::update_sprites()
+    {
+	for (int offs = 0; offs < 0x80; offs += 2)
+	{
+	    int sprite_num = (obj_ram.at(offs) & 0x7F);
+	    int pal_num = (obj_ram.at(offs + 1) & 0x3F);
+	    int sy = obj_ram2.at(offs + 1) - 40 + 0x100 * (obj_ram3.at(offs + 1) & 3);
+	    int sx = (obj_ram2.at(offs) - 17);
+
+	    int sprite_attribs = obj_ram3.at(offs);
+
+	    bool flipx = testbit(sprite_attribs, 1);
+	    bool flipy = testbit(sprite_attribs, 0);
+
+	    int scale = ((sprite_attribs >> 2) & 0x3);
+
+	    switch (scale)
+	    {
+		// Normal sprite
+		case 0:
+		{
+		    draw_sprite(sprite_num, pal_num, sx, sy, flipx, flipy);
+		}
+		break;
+		// Double height sprite
+		case 1:
+		{
+		    draw_sprite(sprite_num, pal_num, sx, (sy + 16), flipx, flipy);
+		    draw_sprite((sprite_num + 1), pal_num, sx, sy, flipx, flipy);
+		}
+		break;
+		// Double width sprite
+		case 2:
+		{
+		    draw_sprite(sprite_num, pal_num, (sx + 16), sy, flipx, flipy);
+		    draw_sprite((sprite_num + 2), pal_num, sx, sy, flipx, flipy);
+		}
+		break;
+		// Double size sprite
+		case 3:
+		{
+		    draw_sprite(sprite_num, pal_num, (sx + 16), sy, flipx, flipy);
+		    draw_sprite((sprite_num + 1), pal_num, (sx + 16), (sy + 16), flipx, flipy);
+		    draw_sprite((sprite_num + 2), pal_num, sx, sy, flipx, flipy);
+		    draw_sprite((sprite_num + 3), pal_num, sx, (sy + 16), flipx, flipy);
+		}
+		break;
+	    }
+	}
+    }
+
+    void galagavideo::update_tiles()
     {
 	for (int addr = 0; addr < 64; addr++)
 	{
@@ -119,25 +178,7 @@ namespace berrn
 	}
     }
 
-    void pacmanvideo::update_sprites()
-    {
-	for (int sprite = 7; sprite >= 0; sprite--)
-	{
-	    int16_t xpos = (224 - obj_pos[(sprite * 2)] + 15);
-	    int16_t ypos = (288 - obj_pos[((sprite * 2) + 1)] - 16);
-
-	    uint8_t sprite_info = obj_ram[(sprite * 2)];
-	    uint8_t pal_num = obj_ram[((sprite * 2) + 1)];
-
-	    bool xflip = testbit(sprite_info, 1);
-	    bool yflip = testbit(sprite_info, 0);
-
-	    uint8_t sprite_num = (sprite_info >> 2);
-	    draw_sprite(sprite_num, pal_num, xpos, ypos, xflip, yflip);
-	}
-    }
-
-    void pacmanvideo::set_pixel(int xpos, int ypos, uint8_t color_num)
+    void galagavideo::set_pixel(int xpos, int ypos, uint8_t color_num)
     {
 	if (!inRange(xpos, 0, 224) || !inRange(ypos, 0, 288))
 	{
@@ -164,7 +205,7 @@ namespace berrn
 	bitmap->setPixel(xpos, ypos, fromRGB(red, green, blue));
     }
 
-    void pacmanvideo::draw_tile(int tile_num, int pal_num, int xcoord, int ycoord)
+    void galagavideo::draw_tile(int tile_num, int pal_num, int xcoord, int ycoord)
     {
 	int base_x = ((xcoord - 2) * 8);
 	int base_y = (ycoord * 8);
@@ -181,24 +222,30 @@ namespace berrn
 	    int px = (7 - (pixel / 8));
 
 	    uint8_t color_num = tile_ram[((tile_num * 64) + pixel)];
+
 	    int xpos = (base_x + px);
 	    int ypos = (base_y + py);
-	    uint8_t color = pal_rom[((pal_offs * 4) + color_num)];
+	    uint8_t color = ((tile_pal_rom[((pal_offs * 4) + color_num)] & 0xF) | 0x10);
+
+	    if (color == 0x1F)
+	    {
+		continue;
+	    }
+
 	    set_pixel(xpos, ypos, color);
 	}
     }
 
-    void pacmanvideo::draw_sprite(int sprite_num, int pal_num, int xcoord, int ycoord, bool flipx, bool flipy)
+    void galagavideo::draw_sprite(int sprite_num, int pal_num, int xcoord, int ycoord, bool flipx, bool flipy)
     {
-	if (!inRange(xcoord, -16, 224))
+	if (!inRange(xcoord, -17, 224) || !inRange(ycoord, -40, 288))
 	{
 	    return;
 	}
 
-	int pal_offs = (pal_num & 0x3F);
-
 	int base_x = xcoord;
 	int base_y = ycoord;
+	int pal_offs = (pal_num & 0x3F);
 
 	for (int pixel = 0; pixel < 256; pixel++)
 	{
@@ -215,19 +262,12 @@ namespace berrn
 		py = (15 - py);
 	    }
 
+	    uint8_t color_num = sprite_ram[((sprite_num * 256) + pixel)];
 	    int xpos = (base_x + px);
 	    int ypos = (base_y + py);
+	    uint8_t color = (sprite_pal_rom[((pal_offs * 4) + color_num)] & 0xF);
 
-	    if (!inRange(xpos, 0, 224))
-	    {
-		continue;
-	    }
-
-	    uint8_t color_num = sprite_ram[((sprite_num * 256) + pixel)];
-
-	    uint8_t color = pal_rom[((pal_offs * 4) + color_num)];
-
-	    if (color == 0)
+	    if (color == 0xF)
 	    {
 		continue;
 	    }
@@ -236,7 +276,7 @@ namespace berrn
 	}
     }
 
-    uint8_t pacmanvideo::readByte(uint16_t addr)
+    uint8_t galagavideo::readByte(uint16_t addr)
     {
 	uint8_t data = 0;
 	addr &= 0x7FF;
@@ -253,7 +293,7 @@ namespace berrn
 	return data;
     }
 
-    void pacmanvideo::writeByte(uint16_t addr, uint8_t data)
+    void galagavideo::writeByte(uint16_t addr, uint8_t data)
     {
 	addr &= 0x7FF;
 
@@ -267,21 +307,21 @@ namespace berrn
 	}
     }
 
-    uint8_t pacmanvideo::readSprites(int addr)
+    void galagavideo::writeSprites(int bank, uint16_t addr, uint8_t data)
     {
-	addr &= 0xF;
-	return obj_ram[addr];
-    }
+	if ((bank < 0) || (bank >= 3))
+	{
+	    return;
+	}
 
-    void pacmanvideo::writeSprites(int addr, uint8_t data)
-    {
-	addr &= 0xF;
-	obj_ram[addr] = data;
-    }
+	addr &= 0x7F;
 
-    void pacmanvideo::writeSpritePos(int addr, uint8_t data)
-    {
-	addr &= 0xF;
-	obj_pos[addr] = data;
+	switch (bank)
+	{
+	    case 0: obj_ram.at(addr) = data; break;
+	    case 1: obj_ram2.at(addr) = data; break;
+	    case 2: obj_ram3.at(addr) = data; break;
+	    default: break;
+	}
     }
 };

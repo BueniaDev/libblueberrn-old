@@ -16,27 +16,24 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef BERRN_PACMAN
-#define BERRN_PACMAN
+#ifndef BERRN_CENTIPEDE
+#define BERRN_CENTIPEDE
 
 #include <libblueberrn_api.h>
 #include <driver.h>
-#include <cpu/zilogz80.h>
-#include <video/pacman.h>
-#include <audio/wsg.h>
+#include <cpu/mos6502.h>
 #include <iostream>
 #include <string>
 using namespace berrn;
-using namespace namcowsg;
 using namespace std;
 
 namespace berrn
 {
-    class LIBBLUEBERRN_API PacmanInterface : public BerrnInterface
+    class LIBBLUEBERRN_API CentipedeBase : public BerrnInterface
     {
 	public:
-	    PacmanInterface(berrndriver &drv);
-	    ~PacmanInterface();
+	    CentipedeBase(berrndriver &drv);
+	    ~CentipedeBase();
 
 	    bool init_core();
 	    void shutdown_core();
@@ -46,58 +43,55 @@ namespace berrn
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
-	    uint8_t readOp8(uint16_t addr);
-	    void portOut(uint16_t port, uint8_t data);
+
+	    virtual bool isValidAddr(uint16_t addr);
+	    virtual uint8_t readMem(uint16_t addr);
+	    virtual void writeMem(uint16_t addr, uint8_t data);
+
+	    void writeLatch(int addr, uint8_t data);
+
+	    virtual void writeLatchUpper(int addr, bool line);
 
 	private:
 	    berrndriver &driver;
-
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t data);
-
-	    uint8_t readUpper(uint16_t addr);
-	    void writeUpper(uint16_t addr, uint8_t data);
-
-	    void writeIO(int addr, uint8_t data);
-
-	    void writePort(uint16_t port, uint8_t data);
-
-	    void update_pixels();
-
 	    BerrnScheduler scheduler;
-	    BerrnZ80Processor *main_proc = NULL;
+
+	    Berrn6502Processor *main_proc = NULL;
 	    BerrnCPU *main_cpu = NULL;
 
-	    BerrnTimer *interrupt_timer = NULL;
 	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *sound_timer = NULL;
+	    BerrnTimer *interrupt_timer = NULL;
 
-	    pacmanvideo *video_core = NULL;
+	    BerrnBitmapRGB *bitmap = NULL;
 
-	    vector<uint8_t> game_rom;
+	    array<uint8_t, 0x400> main_ram;
 
-	    array<uint8_t, 0x3F0> ram;
+	    // TODO: Properly implement video hardware
+	    array<uint8_t, 0x400> temp_vram;
 
-	    wsg3device *audio_chip = NULL;
+	    int current_scanline = 0;
 
-	    bool is_irq_enabled = false;
-
-	    uint8_t irq_vector = 0;
-
-	    uint8_t port0_val = 0;
-	    uint8_t port1_val = 0;
-
-	    // TODO: Implement core audio resampling functionality
-	    float out_time = 0.0f;
-	    float in_time = 0.0f;
-	    float out_step = 0.0f;
+	    vector<uint8_t> main_rom;
     };
 
-    class LIBBLUEBERRN_API driverpacman : public berrndriver
+    class LIBBLUEBERRN_API CentipedeCore : public CentipedeBase
     {
 	public:
-	    driverpacman();
-	    ~driverpacman();
+	    CentipedeCore(berrndriver &drv);
+	    ~CentipedeCore();
+
+	    bool isValidAddr(uint16_t addr);
+	    uint8_t readMem(uint16_t addr);
+	    void writeMem(uint16_t addr, uint8_t data);
+
+	    void writeLatchUpper(int addr, bool line);
+    };
+
+    class LIBBLUEBERRN_API drivercentiped : public berrndriver
+    {
+	public:
+	    drivercentiped();
+	    ~drivercentiped();
 
 	    string drivername();
 	    bool hasdriverROMs();
@@ -106,14 +100,12 @@ namespace berrn
 	    void drvshutdown();
 	    void drvrun();
 
-	    float get_framerate();
-
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    PacmanInterface *inter = NULL;
+	    CentipedeCore *core = NULL;
     };
 };
 
 
-#endif // BERRN_PACMAN
+#endif // BERRN_CENTIPEDE

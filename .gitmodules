@@ -13,3 +13,6 @@
 [submodule "libblueberrn/components/cpu/m68k/Botsashi"]
 	path = libblueberrn/components/cpu/m68k/Botsashi
 	url = https://github.com/BueniaDev/Botsashi.git
+[submodule "libblueberrn/components/cpu/m6502/Bee6502"]
+	path = libblueberrn/components/cpu/m6502/Bee6502
+	url = https://github.com/BueniaDev/Bee6502.git

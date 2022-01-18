@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -20,10 +20,15 @@
 #define BERRN_UTILS_H
 
 #include <cstdint>
+#include <functional>
 using namespace std;
+using namespace std::placeholders;
 
 namespace berrn
 {
+    using berrncbread8 = function<uint8_t(int)>;
+    using berrncbwrite8 = function<void(int, uint8_t)>;
+
     template<typename T>
     bool testbit(T reg, int bit)
     {

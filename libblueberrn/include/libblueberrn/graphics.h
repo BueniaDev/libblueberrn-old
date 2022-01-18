@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -33,65 +33,122 @@ namespace berrn
 {
     struct berrnRGBA
     {
-	uint8_t red;
-	uint8_t green;
-	uint8_t blue;
-	uint8_t alpha;
+	union
+	{
+	    struct
+	    {
+		uint8_t red;
+		uint8_t green;
+		uint8_t blue;
+		uint8_t alpha;
+	    };
+
+	    uint8_t raw[4];
+	    uint32_t val;
+	};
+
+	berrnRGBA() : val(0)
+	{
+
+	}
+
+	berrnRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) : red(r), green(g), blue(b), alpha(a)
+	{
+
+	}
+
+	berrnRGBA(const berrnRGBA &c) : val(c.val)
+	{
+
+	}
+
+	uint8_t& at(int index)
+	{
+	    if (index >= 4)
+	    {
+		cout << "Error: Color index out of bounds" << endl;
+		exit(0);
+	    }
+
+	    return raw[index];
+	}
+
+	uint8_t& operator[](int index)
+	{
+	    return at(index);
+	}
+
+	berrnRGBA &operator =(const berrnRGBA &c)
+	{
+	    if (this != &c)
+	    {
+		val = c.val;
+	    }
+
+	    return *this;
+	}
     };
 	
     inline berrnRGBA red()
     {
-	return {255, 0, 0, 255};
+	return berrnRGBA(255, 0, 0);
     }
 	
     inline berrnRGBA green()
     {
-	return {0, 255, 0, 255};
+	return berrnRGBA(0, 255, 0);
     }
 	
     inline berrnRGBA blue()
     {
-	return {0, 0, 255, 255};
+	return berrnRGBA(0, 0, 255);
     }
 
     inline berrnRGBA cyan()
     {
-	return {0, 255, 255, 255};
+	return berrnRGBA(0, 255, 255);
     }
 
     inline berrnRGBA magenta()
     {
-	return {255, 0, 255, 255};
+	return berrnRGBA(255, 0, 255);
     }
 
     inline berrnRGBA yellow()
     {
-	return {255, 255, 0, 255};
+	return berrnRGBA(255, 255, 0);
     }
 
     inline berrnRGBA black()
     {
-	return {0, 0, 0, 255};
+	return berrnRGBA(0, 0, 0);
     }
 
     inline berrnRGBA white()
     {
-	return {255, 255, 255, 255};
+	return berrnRGBA(255, 255, 255);
+    }
+
+    inline berrnRGBA fromLevel(int level, int bpp)
+    {
+	int level_ratio = ((1 << bpp) - 1);
+	uint8_t color = ((level * 255) / level_ratio);
+	return berrnRGBA(color, color, color);
     }
 
     inline berrnRGBA fromColor(uint8_t color)
     {
-	return {color, color, color, 255};
+	return berrnRGBA(color, color, color);
     }
 
     inline berrnRGBA fromRGB(uint8_t red, uint8_t green, uint8_t blue)
     {
-	return {red, green, blue, 255};
+	return berrnRGBA(red, green, blue);
     }
 
     inline berrnRGBA fromRGBA(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha)
     {
-	return {red, green, blue, alpha};
+	return berrnRGBA(red, green, blue, alpha);
     }
 
     enum BerrnBitmapFormat
@@ -163,7 +220,7 @@ namespace berrn
 	    {
 		if (inRange(x, 0, width()) && inRange(y, 0, height()))
 		{
-		    framebuffer[x + (y * width())] = color;
+		    framebuffer.at(x + (y * width())) = color;
 		}
 	    }
 
@@ -194,10 +251,7 @@ namespace berrn
     #define gfx_step2(start, step) start, (start + step)
     #define gfx_step4(start, step) gfx_step2(start, step), gfx_step2((start + (2 * step)), step)
     #define gfx_step8(start, step) gfx_step4(start, step), gfx_step4((start + (4 * step)), step)
-
-    #define gfx_rstep2(start, step) (start + step), start
-    #define gfx_rstep4(start, step) gfx_rstep2((start + (2 * step)), step), gfx_rstep2(start, step)
-    #define gfx_rstep8(start, step) gfx_rstep4((start + (4 * step)), step), gfx_rstep4(start, step)
+    #define gfx_step16(start, step) gfx_step8(start, step), gfx_step8((start + (8 * step)), step)
 
     struct BerrnGfxLayout
     {
@@ -254,6 +308,14 @@ namespace berrn
 	    dst_offs += buf_delta;
 	}
     }
+
+    enum BerrnRotation : int
+    {
+	None = 0,
+	Rot90 = 1,
+	Rot180 = 2,
+	Rot270 = 3,
+    };
 };
 
 #endif // BERRN_GFX_H

@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,6 +22,9 @@
 #include <libblueberrn_api.h>
 #include <driver.h>
 #include <cpu/zilogz80.h>
+#include <video/galaga.h>
+#include <audio/wsg.h>
+#include <audio/namco54.h>
 #include <machine/namco06.h>
 #include <machine/namco51.h>
 #include <iostream>
@@ -31,83 +34,26 @@ using namespace std;
 
 namespace berrn
 {
-    enum CPUType : int
-    {
-	Main = 0,
-	Aux = 1,
-	Sound = 2,
-    };
-
     class GalagaCore;
 
-    class LIBBLUEBERRN_API GalagaInterface
+    class GalagaInterface
     {
 	public:
 	    GalagaInterface(GalagaCore &core);
 	    ~GalagaInterface();
 
-	    void init();
-	    void shutdown();
-
 	    uint8_t readByte(uint16_t addr);
 	    void writeByte(uint16_t addr, uint8_t data);
 
-	    bool isValidAddr(uint16_t addr);
-
-	    void updatePixels();
-
-	    BerrnBitmapRGB *getBitmap()
-	    {
-		return bitmap;
-	    }
-
-	    void set_tile_rom(vector<uint8_t> rom_vec)
-	    {
-		tile_rom = vector<uint8_t>(rom_vec.begin(), rom_vec.end());
-	    }
-
-	    void set_pal_rom(vector<uint8_t> rom_vec)
-	    {
-		pal_rom = vector<uint8_t>(rom_vec.begin(), rom_vec.end());
-	    }
-
-	    void set_color_rom(vector<uint8_t> rom_vec)
-	    {
-		color_rom = vector<uint8_t>(rom_vec.begin(), rom_vec.end());
-	    }
-
 	private:
 	    GalagaCore &parent_core;
-
-	    array<uint8_t, 0x800> vram;
-	    array<uint8_t, 0x400> ram1;
-	    array<uint8_t, 0x400> ram2;
-	    array<uint8_t, 0x400> ram3;
-
-	    void decode_images();
-	    void decode_strip(const uint8_t *src, uint8_t *dst, int bx, int by, int width);
-
-	    void draw_tile(uint8_t tile_num, array<uint8_t, 4> palette, int xcoord, int ycoord);
-
-	    void set_pixel(int xpos, int ypos, uint8_t color_num);
-	    array<uint8_t, 4> get_palette(int pal_num);
-
-	    uint8_t dsw_a = 0;
-	    uint8_t dsw_b = 0;
-
-	    vector<uint8_t> tile_rom;
-	    vector<uint8_t> tile_ram;
-	    vector<uint8_t> pal_rom;
-	    vector<uint8_t> color_rom;
-
-	    BerrnBitmapRGB *bitmap = NULL;
     };
 
-    class LIBBLUEBERRN_API GalagaCPU : public BerrnInterface
+    class GalagaCPUInterface : public BerrnInterface
     {
 	public:
-	    GalagaCPU(GalagaInterface *cb);
-	    ~GalagaCPU();
+	    GalagaCPUInterface(string tag_str, berrndriver &drv, GalagaInterface &inter);
+	    ~GalagaCPUInterface();
 
 	    void init();
 	    void shutdown();
@@ -116,95 +62,92 @@ namespace berrn
 	    void writeCPU8(uint16_t addr, uint8_t data);
 	    uint8_t readOp8(uint16_t addr);
 
-	    void set_core_rom(vector<uint8_t> rom_vec)
-	    {
-		core_rom = vector<uint8_t>(rom_vec.begin(), rom_vec.end());
-	    }
-
 	private:
-	    vector<uint8_t> core_rom;
-
-	    GalagaInterface *inter = NULL;
+	    string tag;
+	    berrndriver &driver;
+	    GalagaInterface &interface;
 
 	    uint8_t readByte(uint16_t addr);
+	    void writeByte(uint16_t addr, uint8_t data);
+
+	    vector<uint8_t> cpu_rom;
     };
 
-    class LIBBLUEBERRN_API GalagaCore : public BerrnInterface
+    class GalagaCore
     {
 	public:
 	    GalagaCore(berrndriver &drv);
 	    ~GalagaCore();
 
-	    void init();
-	    void shutdown();
-
-	    namco06xx *get_namco_06xx()
-	    {
-		return namco_06xx;
-	    }
-
-	    void writeLatch(int offset, uint8_t data);
-
-	    BerrnBitmapRGB *getBitmap()
-	    {
-		return shared_inter->getBitmap();
-	    }
-
-	    void set_rom(CPUType cpu_type, vector<uint8_t> rom_vec)
-	    {
-		switch (cpu_type)
-		{
-		    case Main: main_inter->set_core_rom(rom_vec); break;
-		    case Aux: aux_inter->set_core_rom(rom_vec); break;
-		    case Sound: sound_inter->set_core_rom(rom_vec); break;
-		    default: break;
-		}
-	    }
-
-	    void set_tile_rom(vector<uint8_t> rom_vec)
-	    {
-		shared_inter->set_tile_rom(rom_vec);
-	    }
-
-	    void set_pal_rom(vector<uint8_t> rom_vec)
-	    {
-		shared_inter->set_pal_rom(rom_vec);
-	    }
-
-	    void set_color_rom(vector<uint8_t> rom_vec)
-	    {
-		shared_inter->set_color_rom(rom_vec);
-	    }
-
+	    bool init_core();
+	    void shutdown_core();
 	    void run_core();
-	    void keychanged(BerrnInput key, bool is_pressed);
+	    void key_changed(BerrnInput key, bool is_pressed);
+
+	    uint8_t readByte(uint16_t addr);
+	    void writeByte(uint16_t addr, uint8_t data);
 
 	private:
+	    berrndriver &driver;
 	    BerrnScheduler scheduler;
-	    GalagaCPU *main_inter = NULL;
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
 
-	    GalagaCPU *aux_inter = NULL;
-	    BerrnZ80Processor *aux_proc = NULL;
-	    BerrnCPU *aux_cpu = NULL;
+	    void chip_select_galaga(int addr, bool line);
+	    void rw_galaga(int addr, bool line);
+	    uint8_t read_galaga(int addr);
+	    void write_galaga(int addr, uint8_t data);
 
-	    GalagaCPU *sound_inter = NULL;
-	    BerrnZ80Processor *sound_proc = NULL;
-	    BerrnCPU *sound_cpu = NULL;
+	    int64_t time_until_scanline(int scanline);
 
-	    GalagaInterface *shared_inter = NULL;
+	    uint8_t read_io_ports(int addr);
 
-	    namco06xx *namco_06xx = NULL;
-	    namco51xx *namco_51xx = NULL;
+	    void write_latch(int addr, uint8_t data);
 
+	    void fire_main_irq();
+	    void fire_aux_irq();
+	    void fire_51xx_irq();
+
+	    bool main_irq_enabled = false;
 	    bool aux_irq_enabled = false;
 	    bool sound_irq_enabled = false;
 
-	    BerrnTimer *interrupt_timer = NULL;
 	    BerrnTimer *vblank_timer = NULL;
+	    BerrnTimer *interrupt_timer = NULL;
+	    BerrnTimer *sound_nmi_timer = NULL;
+	    BerrnTimer *sound_timer = NULL;
 
-	    berrndriver &driver;
+	    GalagaInterface *shared_inter = NULL;
+
+	    GalagaCPUInterface *main_inter = NULL;
+	    BerrnZ80Processor *main_proc = NULL;
+	    BerrnCPU *main_cpu = NULL;
+
+	    GalagaCPUInterface *aux_inter = NULL;
+	    BerrnZ80Processor *aux_proc = NULL;
+	    BerrnCPU *aux_cpu = NULL;
+
+	    GalagaCPUInterface *sound_inter = NULL;
+	    BerrnZ80Processor *sound_proc = NULL;
+	    BerrnCPU *sound_cpu = NULL;
+
+	    namco06xx *namco_06xx = NULL;
+	    namco51xx *namco_51xx = NULL;
+	    namco54xx *namco_54xx = NULL;
+
+	    array<uint8_t, 0x400> main_ram1;
+	    array<uint8_t, 0x400> main_ram2;
+	    array<uint8_t, 0x400> main_ram3;
+
+	    int64_t vblank_start_time = 0;
+
+	    wsg3device *wsg3_device = NULL;
+
+	    uint8_t dsw_a = 0x00;
+	    uint8_t dsw_b = 0x00;
+
+	    uint8_t port0_val = 0;
+	    uint8_t port1_val = 0;
+
+	    galagavideo *video_core = NULL;
     };
 
     class LIBBLUEBERRN_API drivergalaga : public berrndriver
@@ -223,8 +166,7 @@ namespace berrn
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    GalagaCore *galaga_core = NULL;
-	    bool loadROMs();
+	    GalagaCore *core = NULL;
     };
 };
 

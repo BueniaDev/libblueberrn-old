@@ -1,3 +1,21 @@
+/*
+    This file is part of libblueberrn.
+    Copyright (C) 2022 BueniaDev.
+
+    libblueberrn is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    libblueberrn is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 #ifndef BERRNSCHEDULER_H
 #define BERRNSCHEDULER_H
 
@@ -15,6 +33,11 @@ using namespace std;
 
 namespace berrn
 {
+    inline int64_t time_zero()
+    {
+	return 0;
+    }
+
     inline int64_t time_in_hz(int64_t hz)
     {
 	return (1e6 / hz);
@@ -23,6 +46,16 @@ namespace berrn
     inline int64_t time_in_usec(int64_t usec)
     {
 	return usec;
+    }
+
+    inline int64_t time_in_sec(int64_t sec)
+    {
+	return (sec * 1e6);
+    }
+
+    inline int64_t time_in_msec(int64_t msec)
+    {
+	return (msec * 1000);
     }
 
     class BerrnScheduler;
@@ -38,10 +71,40 @@ namespace berrn
 	    virtual void stop_timeslice() = 0;
     };
 
+    class BerrnNull : public BerrnDevice
+    {
+	public:
+	    void reset()
+	    {
+		usec_time = 0;
+	    }
+
+	    int64_t get_exec_time()
+	    {
+		return usec_diff;
+	    }
+
+	    int64_t execute(int64_t until_time)
+	    {
+		usec_diff = (until_time - usec_time);
+		usec_time = until_time;
+		return until_time;
+	    }
+
+	    void stop_timeslice()
+	    {
+		usec_time = 0;
+	    }
+
+	private:
+	    int64_t usec_time = 0;
+	    int64_t usec_diff = 0;
+    };
+
     class BerrnProcessor
     {
 	public:
-	    virtual ~BerrnProcessor()
+	    ~BerrnProcessor()
 	    {
 
 	    }
@@ -94,21 +157,16 @@ namespace berrn
 		(void)is_halting;
 		return;
 	    }
+
+	    virtual void debug_output()
+	    {
+		return;
+	    }
     };
 
     class BerrnInterface
     {
 	public:
-	    virtual void init()
-	    {
-		return;
-	    }
-
-	    virtual void shutdown()
-	    {
-		return;
-	    }
-
 	    virtual uint8_t readCPU8(uint16_t addr)
 	    {
 		cout << "Reading byte from address of " << hex << (int)addr << endl;
@@ -196,6 +254,19 @@ namespace berrn
 		current_time = 0;
 	    }
 
+	    void shutdown()
+	    {
+		for (auto &timer : timers)
+		{
+		    remove_timer(timer);
+		}
+
+		for (auto &device : devices)
+		{
+		    remove_device(device);
+		}
+	    }
+
 	    void add_timer(BerrnTimer *timer);
 
 	    void remove_timer(BerrnTimer *timer)
@@ -257,7 +328,7 @@ namespace berrn
 		    }
 		}
 
-		current_time = static_cast<uint64_t>(until_time);
+		current_time = until_time;
 	    }
 
 	    int64_t get_current_time()
@@ -300,8 +371,6 @@ namespace berrn
 		is_enabled = false;
 		period_usec = 0;
 		is_periodic = false;
-
-		scheduler.add_timer(this);
 	    }
 
 	    ~BerrnTimer()
@@ -311,13 +380,18 @@ namespace berrn
 
 	    void start(int64_t period, bool is_persistent, int64_t param = 0)
 	    {
+		start(period, period, is_persistent, param);
+	    }
+
+	    void start(int64_t start_delay, int64_t period, bool is_persistent, int64_t param = 0)
+	    {
 		assert(period >= 0);
 		timer_param = param;
 		period_usec = period;
 		is_periodic = is_persistent;
 		is_enabled = true;
 		scheduler.remove_timer(this);
-		expiration_time = (scheduler.get_current_time() + period);
+		expiration_time = (scheduler.get_current_time() + start_delay);
 		scheduler.add_timer(this);
 	    }
 
@@ -352,9 +426,9 @@ namespace berrn
 
 	    int64_t expiration_time;
 	    bool is_enabled;
+	    string tag_str;
 
 	private:
-	    string tag_str;
 	    BerrnScheduler &scheduler;
 	    timerfunc timercallback;
 	    int64_t period_usec;
@@ -365,6 +439,7 @@ namespace berrn
     enum SuspendReason : int
     {
 	Reset = 0,
+	AnyReason = 6,
     };
 
     class BerrnCPU : public BerrnDevice
@@ -404,13 +479,23 @@ namespace berrn
 		return current_time;
 	    }
 
-	    bool is_suspended(SuspendReason reason)
+	    bool is_suspended(SuspendReason reason = SuspendReason::AnyReason)
 	    {
+		if (reason == SuspendReason::AnyReason)
+		{
+		    return (suspend_flags != 0);
+		}
+
 		return testbit(suspend_flags, int(reason));
 	    }
 
 	    void suspend(SuspendReason reason)
 	    {
+		if (reason == SuspendReason::AnyReason)
+		{
+		    return;
+		}
+
 		suspend_flags = setbit(suspend_flags, int(reason));
 		processor.abort_timeslice();
 		processor.halt(true);
@@ -418,6 +503,11 @@ namespace berrn
 
 	    void resume(SuspendReason reason)
 	    {
+		if (reason == SuspendReason::AnyReason)
+		{
+		    return;
+		}
+
 		suspend_flags = resetbit(suspend_flags, int(reason));
 		processor.abort_timeslice();
 		processor.halt(false);

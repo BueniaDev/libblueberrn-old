@@ -9,6 +9,8 @@ enum UiLanguage : int
     English,
     Japanese,
     Korean,
+    Spanish,
+    French,
     Max,
 };
 
@@ -22,31 +24,51 @@ void set_current_language(UiLanguage language)
 vector<BerrnTranslate> en_trans =
 {
     {"File", "File"},
-    {"Load driver...", "Load driver..."},
-    {"Stop driver...", "Stop driver..."},
+    {"Load machine...", "Load machine..."},
+    {"Stop machine...", "Stop machine..."},
     {"Quit", "Quit"},
-    {"Select a driver...", "Select a driver..."},
+    {"Select a machine...", "Select a machine..."},
     {"Language...", "Language..."},
 };
 
 vector<BerrnTranslate> ja_trans =
 {
     {"File", u8"ファイル"},
-    {"Load driver...", u8"ロードドライバ..."},
-    {"Stop driver...", u8"ストップドライバー..."},
+    {"Load machine...", u8"マシンをロードします... "},
+    {"Stop machine...", u8"マシンを停止します..."},
     {"Quit", u8"辞める"},
-    {"Select a driver...", u8"ドライバーを選択..."},
-    {"Language...", "言語..."},
+    {"Select a machine...", u8"マシンを選択..."},
+    {"Language...", u8"言語..."},
 };
 
 vector<BerrnTranslate> ko_trans = 
 {
     {"File", u8"파일"},
-    {"Load driver...", u8"로드 드라이버..."},
-    {"Stop driver...", u8"중지 드라이버..."},
+    {"Load machine...", u8"로드 머신..."},
+    {"Stop machine...", u8"기계 그만..."},
     {"Quit", u8"그만두 다"},
-    {"Select a driver...", u8"드라이버를 선택..."},
-    {"Language...", "언어..."},
+    {"Select a machine...", u8"머신 선택..."},
+    {"Language...", u8"언어..."},
+};
+
+vector<BerrnTranslate> es_trans =
+{
+    {"File", u8"Archivo"},
+    {"Load machine...", u8"Cargar máquina... "},
+    {"Stop machine...", u8"Detener la máquina..."},
+    {"Quit", u8"Renunciar"},
+    {"Select a machine...", u8"Seleccione una máquina... "},
+    {"Language...", u8"Idioma..."},
+};
+
+vector<BerrnTranslate> fr_trans =
+{
+    {"File", u8"Déposer"},
+    {"Load machine...", u8"Charger la machine..."},
+    {"Stop machine...", u8"Arrêter la machine... "},
+    {"Quit", u8"Quitter"},
+    {"Select a machine...", u8"Sélectionnez une machine... "},
+    {"Language...", u8"Langue..."},
 };
 
 unordered_map<UiLanguage, vector<BerrnTranslate>> translations =
@@ -54,6 +76,8 @@ unordered_map<UiLanguage, vector<BerrnTranslate>> translations =
     {English, en_trans},
     {Japanese, ja_trans},
     {Korean, ko_trans},
+    {Spanish, es_trans},
+    {French, fr_trans},
 };
 
 const char* get_translation(string source)

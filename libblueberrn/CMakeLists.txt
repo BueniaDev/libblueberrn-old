@@ -1,6 +1,7 @@
 add_subdirectory(components)
 add_subdirectory(machine)
 add_subdirectory(video)
+add_subdirectory(audio)
 
 set(LIBBLUEBERRN
 	libblueberrn/src/core/libblueberrn.cpp
@@ -12,8 +13,11 @@ set(LIBBLUEBERRN
 	libblueberrn/src/drivers/galaga.cpp
 	libblueberrn/src/drivers/system1.cpp
 	libblueberrn/src/drivers/rastan.cpp
+	libblueberrn/src/drivers/centipede.cpp
+	libblueberrn/src/drivers/1942.cpp
 	${MACHINE_SOURCES}
 	${VIDEO_SOURCES}
+	${AUDIO_SOURCES}
 	PARENT_SCOPE)
 
 set(LIBBLUEBERRN_HEADERS
@@ -32,6 +36,9 @@ set(LIBBLUEBERRN_HEADERS
 	libblueberrn/include/drivers/galaga.h
 	libblueberrn/include/drivers/system1.h
 	libblueberrn/include/drivers/rastan.h
+	libblueberrn/include/drivers/centipede.h
+	libblueberrn/include/drivers/1942.h
 	${MACHINE_HEADERS}
 	${VIDEO_HEADERS}
+	${AUDIO_HEADERS}
 	PARENT_SCOPE)

@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -26,12 +26,14 @@
 #include <vector>
 #include <array>
 #include <bitset>
+#include <functional>
 #include <utils.h>
 #include <scheduler.h>
 #include <graphics.h>
 #include <libblueberrn_api.h>
 namespace fs = std::filesystem;
 using namespace std;
+using namespace std::placeholders;
 
 namespace berrn
 {	
@@ -312,7 +314,110 @@ namespace berrn
 
 	    vector<berrnmemoryregion*> memory_regions;
 	    bool is_zip_loaded = false;
-	    bool isfilesloaded = false;
+    };
+
+    class LIBBLUEBERRN_API berrnaudiodevice
+    {
+	public:
+	    berrnaudiodevice()
+	    {
+
+	    }
+
+	    void set_sample_rates(uint32_t clk_rate, uint32_t sample_rate)
+	    {
+		out_step = get_clock_rate(clk_rate);
+		in_step = sample_rate;
+		out_time = 0.0f;
+	    }
+
+	    vector<int32_t> fetch_samples()
+	    {
+		while (out_step > out_time)
+		{
+		    clock_chip();
+		    out_time += in_step;
+		}
+
+		out_time -= out_step;
+
+		vector<int32_t> samples = get_samples();
+		return samples;
+	    }
+
+	    virtual uint32_t get_clock_rate(uint32_t clk_rate)
+	    {
+		return clk_rate;
+	    }
+
+	    virtual void clock_chip()
+	    {
+		return;
+	    }
+
+	    virtual vector<int32_t> get_samples()
+	    {
+		vector<int32_t> empty_samples;
+		return empty_samples;
+	    }
+
+	private:
+	    float out_step = 0.0f;
+	    float in_step = 0.0f;
+	    float out_time = 0.0f;
+    };
+
+    class LIBBLUEBERRN_API berrnmixer
+    {
+	public:
+	    berrnmixer(BlueberrnFrontend *cb) : front(cb)
+	    {
+
+	    }
+
+	    void add_mono(int32_t sample, double gain = 1.0)
+	    {
+		int32_t adjusted_sample = int32_t(double(sample) * gain);
+		mixed_samples[0] += adjusted_sample;
+		mixed_samples[1] += adjusted_sample;
+	    }
+
+	    void add_stereo(int32_t left, int32_t right, double gain = 1.0)
+	    {
+		array<int32_t, 2> samples = {left, right};
+		add_stereo(samples, gain);
+	    }
+
+	    void add_stereo(array<int32_t, 2> samples, double gain = 1.0)
+	    {
+		for (int i = 0; i < 2; i++)
+		{
+		    int32_t adjusted_sample = int32_t(double(samples[i]) * gain);
+		    mixed_samples[i] += adjusted_sample;
+		}
+	    }
+
+	    void output_sample()
+	    {
+		array<int16_t, 2> final_samples;
+
+		for (int i = 0; i < 2; i++)
+		{
+		    final_samples[i] = clamp<int16_t>(mixed_samples[i], -32768, 32767);
+		}
+
+		if (front != NULL)
+		{
+		    front->audioCallback(final_samples);
+		}
+
+		mixed_samples.fill(0);
+	    }
+
+	private:
+	    BlueberrnFrontend *front = NULL;
+
+	    array<int32_t, 2> mixed_samples = {0, 0};
     };
 
     class LIBBLUEBERRN_API berrndriver
@@ -351,6 +456,7 @@ namespace berrn
 	    {
 		front = cb;
 		rom_load = new berrnROM(front);
+		mixer = new berrnmixer(front);
 	    }
       
 	    void resize(int width, int height, int scale = 1)
@@ -430,40 +536,37 @@ namespace berrn
 	    {
 		if (front == NULL)
 		{
+		    cout << "Frontend is NULL" << endl;
 		    return {0, 0};
 		}
 
 		if (!front->hasSounds())
 		{
+		    cout << "Frontend has no sounds" << endl;
 		    return {0, 0};
 		}
 
 		return front->getMixedSamples();
 	    }
 
+	    void addMonoSample(int32_t sample)
+	    {
+		mixer->add_mono(sample);
+	    }
+
+	    void addStereoSample(int32_t left, int32_t right)
+	    {
+		mixer->add_stereo(left, right);
+	    }
+
 	    void mixSample(array<int16_t, 2> samples)
 	    {
-		int32_t current_left = final_samples[0];
-		int32_t current_right = final_samples[1];
-
-		int32_t new_left = samples[0];
-		int32_t new_right = samples[1];
-
-		int32_t mixed_left = (current_left + new_left);
-		int32_t mixed_right = (current_right + new_right);
-
-		final_samples = {int16_t(mixed_left), int16_t(mixed_right)};
+		addStereoSample(samples[0], samples[1]);
 	    }
 
 	    void outputAudio()
 	    {
-		if (front == NULL)
-		{
-		    return;
-		}
-
-		front->audioCallback(final_samples);
-		final_samples.fill(0);
+		mixer->output_sample();
 	    }
 
 	    void drawpixels()
@@ -518,13 +621,10 @@ namespace berrn
 		return rom_load->fetch_mem_region(tag);
 	    }
 
+	protected:
+	    berrnmixer *mixer = NULL;
+
 	private:
-	    bool is_dir_check = false;
-	    bool is_dir_exists = false;
-
-	    bool is_samples_dir = false;
-	    bool is_samples_dir_exists = false;
-
 	    string romspath = "";
 	    string dirname = "";
 

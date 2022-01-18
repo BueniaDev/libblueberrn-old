@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -244,7 +244,7 @@ namespace berrn
 	main_ppi.shutdown();
 	main_inter.shutdown();
 	main_proc->shutdown();
-	scheduler.remove_device(main_cpu);
+	scheduler.shutdown();
     }
 
     void SegaSys1PPI::run()

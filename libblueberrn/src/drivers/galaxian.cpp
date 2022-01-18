@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -87,6 +87,9 @@ namespace berrn
 
 	game_rom = driver.get_rom_region("cpu");
 
+	port0_val = 0;
+	port1_val = 0;
+
 	return true;
     }
 
@@ -97,9 +100,7 @@ namespace berrn
 	interrupt_timer->stop();
 	vblank_timer->stop();
 	ram.fill(0);
-	scheduler.remove_timer(interrupt_timer);
-	scheduler.remove_timer(vblank_timer);
-	scheduler.remove_device(main_cpu);
+	scheduler.shutdown();
     }
 
     void GalaxianInterface::run_core()
@@ -116,13 +117,40 @@ namespace berrn
 
     void GalaxianInterface::key_changed(BerrnInput key, bool is_pressed)
     {
-
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		port0_val = changebit(port0_val, 0, is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		port1_val = changebit(port1_val, 0, is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		port0_val = changebit(port0_val, 2, is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		port0_val = changebit(port0_val, 3, is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnFireP1:
+	    {
+		port0_val = changebit(port0_val, 4, is_pressed);
+	    }
+	    break;
+	    default: break;
+	}
     }
 
     void GalaxianInterface::update_pixels()
     {
 	video_core->update_pixels();
-	driver.setScreen(video_core->get_bitmap());
     }
 
     uint8_t GalaxianInterface::readCPU8(uint16_t addr)
@@ -157,25 +185,23 @@ namespace berrn
 	}
 	else if (inRange(addr, 0x6000, 0x6800))
 	{
-	    // TODO: IN0 reads
-	    data = 0x00;
+	    data = port0_val;
 	}
 	else if (inRange(addr, 0x6800, 0x7000))
 	{
-	    // TODO: IN1 reads
-	    data = 0x00;
+	    data = port1_val;
 	}
 	else if (inRange(addr, 0x7000, 0x7800))
 	{
 	    // IN2 port values
 	    //
-	    // Bits 0-1: Bonus life at:
+	    // Bits 0-1 - Bonus life at:
 	    // 0 = 7000 points
 	    // 1 = 10000 points
 	    // 2 = 12000 points
 	    // 3 = 20000 points
 	    //
-	    // Bit 2 - Number of lives per individual game
+	    // Bit 2 - Number of lives per game:
 	    // 0 = 2 lives
 	    // 1 = 3 lives
 

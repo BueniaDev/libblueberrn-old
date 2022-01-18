@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,22 +27,61 @@ using namespace std;
 
 namespace berrn
 {
+    using namco06read = function<uint8_t(int)>;
+    using namco06write = function<void(int, uint8_t)>;
+    using namco06rw = function<void(int, bool)>;
+    using namco06sel = function<void(int, bool)>;
+
     class namco06xx
     {
 	public:
-	    namco06xx(BerrnCPU &cpu);
+	    namco06xx(BerrnCPU &cpu, uint64_t clk_freq);
 	    ~namco06xx();
 
-	    uint8_t readControl();
+	    uint8_t read_control();
+	    uint8_t read_data();
 
-	    void writeControl(uint8_t data);
-	    void writeData(uint8_t data);
+	    void write_control(uint8_t data);
+	    void write_data(uint8_t data);
+
+	    void set_read_callback(namco06read func)
+	    {
+		read_func = func;
+	    }
+
+	    void set_write_callback(namco06write func)
+	    {
+		write_func = func;
+	    }
+
+	    void set_chipsel_callback(namco06sel func)
+	    {
+		chipsel_func = func;
+	    }
+
+	    void set_rw_callback(namco06rw func)
+	    {
+		rw_func = func;
+	    }
 
 	private:
 	    BerrnTimer *timer = NULL;
 	    BerrnCPU &main_cpu;
 
 	    uint8_t control_reg = 0;
+
+	    uint64_t clock_freq;
+
+	    namco06read read_func;
+	    namco06write write_func;
+
+	    namco06rw rw_func;
+	    namco06sel chipsel_func;
+
+	    bool rw_stretch = false;
+	    bool rw_change = false;
+	    bool next_timer_state = false;
+	    bool nmi_stretch = false;
     };
 };
 

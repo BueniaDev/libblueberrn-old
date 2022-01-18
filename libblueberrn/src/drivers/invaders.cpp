@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -99,10 +99,8 @@ namespace berrn
 	sound_timer->stop();
 	vblank_timer->stop();
 	interrupt_timer->stop();
-	scheduler.remove_timer(sound_timer);
-	scheduler.remove_timer(vblank_timer);
-	scheduler.remove_timer(interrupt_timer);
-	scheduler.remove_device(main_cpu);
+	scheduler.shutdown();
+	bitmap->clear();
     }
 
     void InvadersCore::load_sound(string filename)

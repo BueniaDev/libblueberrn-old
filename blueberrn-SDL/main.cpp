@@ -1,3 +1,21 @@
+/*
+    This file is part of libblueberrn.
+    Copyright (C) 2022 BueniaDev.
+
+    libblueberrn is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    libblueberrn is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 #ifdef __APPLE__
 #include <SDL.h>
 #else
@@ -12,6 +30,7 @@
 #include <fstream>
 #include <sstream>
 #include <functional>
+#include <cassert>
 #include <ctime>
 #include <filesystem>
 #include <queue>
@@ -101,7 +120,7 @@ class SDL2Frontend : public BlueberrnFrontend
 		return sdl_error("Window could not be created!");
 	    }
 						
-	    render = SDL_CreateRenderer(window, -1, 0);
+	    render = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 				
 	    if (render == NULL)
 	    {
@@ -146,19 +165,17 @@ class SDL2Frontend : public BlueberrnFrontend
 	{
 	    return SDL_LoadBMP_RW(SDL_RWFromConstMem(mem, size), 0);
 	}
+
+	SDL_Surface *load_logo(bool is_xmas_logo)
+	{
+	    const void *mem = is_xmas_logo ? sdl2logoxmas : sdl2logo;
+	    int size = is_xmas_logo ? sdl2logoxmas_len : sdl2logo_len;
+	    return loadbmp(mem, size);
+	}
 				
 	void initsplash()
 	{
-	    SDL_Surface *image = NULL;
-
-	    if (is_xmas_time)
-	    {
-		image = loadbmp(sdl2logoxmas, sdl2logoxmas_len);
-	    }
-	    else
-	    {
-		image = loadbmp(sdl2logo, sdl2logo_len);
-	    }	
+	    SDL_Surface *image = load_logo(is_xmas_time);
 	    optsurface = SDL_ConvertSurface(image, surface->format, 0);
 	    SDL_FreeSurface(image);
 						
@@ -221,8 +238,8 @@ class SDL2Frontend : public BlueberrnFrontend
 				
 	void driverselectionbox()
 	{
-	    ImGui::Begin(get_translation("Select a driver..."));
-	    ImGui::SetWindowSize(get_translation("Select a driver..."), ImVec2(400, 300));
+	    ImGui::Begin(get_translation("Select a machine..."));
+	    ImGui::SetWindowSize(get_translation("Select a machine..."), ImVec2(400, 300));
 	    vector<string> names = core->getdrvnames();
 						
 	    for (string name : names)
@@ -267,7 +284,7 @@ class SDL2Frontend : public BlueberrnFrontend
 
 		if (ImGui::BeginMenu(get_translation("File")))
 		{
-		    if (ImGui::MenuItem(get_translation("Load driver...")))
+		    if (ImGui::MenuItem(get_translation("Load machine...")))
 		    {
 			if (!isdriverloaded)
 			{
@@ -275,7 +292,7 @@ class SDL2Frontend : public BlueberrnFrontend
 			}
 		    }
 										
-		    if (ImGui::MenuItem(get_translation("Stop driver...")))
+		    if (ImGui::MenuItem(get_translation("Stop machine...")))
 		    {
 			if (isdriverloaded)
 			{
@@ -314,6 +331,18 @@ class SDL2Frontend : public BlueberrnFrontend
 		    {
 			cout << "Setting language to Korean..." << endl;
 			set_current_language(Korean);
+		    }
+
+		    if (ImGui::MenuItem(u8"Español"))
+		    {
+			cout << "Setting language to Spanish..." << endl;
+			set_current_language(Spanish);
+		    }
+
+		    if (ImGui::MenuItem(u8"Français"))
+		    {
+			cout << "Setting language to French..." << endl;
+			set_current_language(French);
 		    }
 
 		    ImGui::EndMenu();
@@ -474,12 +503,14 @@ class SDL2Frontend : public BlueberrnFrontend
 	    width = w;
 	    height = h;
 	    scale = s;
+
 	    resizewindow();
 	}
 
 	void drawpixels()
 	{
 	    SDL_RenderClear(render);
+
 	    BerrnBitmap *bitmap = core->getDriver()->getScreen();
 
 	    if (bitmap == NULL)
@@ -487,26 +518,48 @@ class SDL2Frontend : public BlueberrnFrontend
 		return;
 	    }
 
-	    int berrn_w = bitmap->width();
-	    int berrn_h = bitmap->height();
+	    int bmp_width = bitmap->width();
+	    int bmp_height = bitmap->height();
 
-	    SDL_Texture *bitmapTex = NULL;
+	    SDL_Surface *bmp_surface = SDL_CreateRGBSurfaceWithFormat(0, bmp_width, bmp_height, 32, SDL_PIXELFORMAT_RGBA32);
+
+	    if (bmp_surface == NULL)
+	    {
+		sdl_error("Rendering surface could not be created!");
+		return;
+	    }
+
+	    SDL_Rect pixel = {0, 0, 1, 1};
 
 	    if (bitmap->format() == BerrnRGB)
 	    {
-		BerrnBitmapRGB *rgbBitmap = reinterpret_cast<BerrnBitmapRGB*>(bitmap);
+		BerrnBitmapRGB *bmp = reinterpret_cast<BerrnBitmapRGB*>(bitmap);
 
-		bitmapTex = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, berrn_w, berrn_h);
-
-		assert(bitmapTex);
-		SDL_UpdateTexture(bitmapTex, NULL, rgbBitmap->data().data(), rgbBitmap->pitch());
+		for (int i = 0; i < bmp_width; i++)
+		{
+		    pixel.x = i;
+		    for (int j = 0; j < bmp_height; j++)
+		    {
+			pixel.y = j;
+			berrnRGBA color = bmp->pixel(i, j);
+			SDL_FillRect(bmp_surface, &pixel, SDL_MapRGBA(bmp_surface->format, color.red, color.green, color.blue, color.alpha));
+		    }
+		}
 	    }
 
-	    SDL_Rect dst_rect = {0, menuheight, (width * scale), (height * scale)};
+	    SDL_Texture *bmp_texture = SDL_CreateTextureFromSurface(render, bmp_surface);
+	    SDL_FreeSurface(bmp_surface);
+	
+	    if (bmp_texture == NULL)
+	    {
+		sdl_error("Rendering texture could not be created!");
+		return;
+	    }
 
-	    assert(render && bitmapTex);
-	    SDL_RenderCopy(render, bitmapTex, NULL, &dst_rect);
-	    SDL_DestroyTexture(bitmapTex);
+	    assert(render && bmp_texture);
+	    SDL_Rect dst_rect = {0, menuheight, (width * scale), (height * scale)};
+	    SDL_RenderCopy(render, bmp_texture, NULL, &dst_rect);
+	    SDL_DestroyTexture(bmp_texture);
 	}
 
 	void initbasepath()
@@ -764,21 +817,13 @@ class SDL2Frontend : public BlueberrnFrontend
 	int width = startwidth;
 	int height = startheight;
 	int scale = startscale;
-				
+	
 	int wheel = 0;
 	int menuheight = 0;
 		
 	bool driverselbox = false;
 
 	bool is_dir_check = false;
-
-	struct SDL2Tex
-	{
-	    SDL_Texture *tex = NULL;
-	    SDL_Rect rect;
-	};
-
-	queue<SDL2Tex> maintex;
 
 	struct zip_t *zip = NULL;
 

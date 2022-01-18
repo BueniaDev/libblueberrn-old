@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -23,7 +23,11 @@ namespace berrn
 {
     driverexample::driverexample()
     {
-
+	device = new BerrnNull();
+	sound_timer = new BerrnTimer("Sound", scheduler, [&](int64_t, int64_t) {
+	    mixSample(getRawSample());
+	    outputAudio();
+	});
     }
 
     driverexample::~driverexample()
@@ -43,6 +47,9 @@ namespace berrn
 
     bool driverexample::drvinit()
     {
+	scheduler.reset();
+	scheduler.add_device(device);
+	device->reset();
 	sample_val = loadWAV("loop.wav");
 
 	if (sample_val != -1)
@@ -55,22 +62,27 @@ namespace berrn
 	bitmap->fillcolor(red());
 
 	resize(640, 480, 1);
+	sound_timer->start(time_in_hz(getSampleRate()), true);
 	return true;
     }
 
     void driverexample::drvshutdown()
     {
-	return;
+	sound_timer->stop();
+	scheduler.shutdown();
     }
   
     void driverexample::drvrun()
     {
-	setScreen(bitmap);
-	for (int i = 0; i < (getSampleRate() / 60); i++)
+	int64_t schedule_time = scheduler.get_current_time();
+	int64_t frame_time = time_in_hz(60);
+
+	while (scheduler.get_current_time() < (schedule_time + frame_time))
 	{
-	    mixSample(getRawSample());
-	    outputAudio();
+	    scheduler.timeslice();
 	}
+
+	setScreen(bitmap);
     }
 
     void driverexample::keychanged(BerrnInput key, bool is_pressed)
