@@ -22,7 +22,7 @@ using namespace berrn;
 namespace berrn
 {
     berrn_rom_start(namco54)
-      berrn_rom_region("mcu54", 0x400)
+      berrn_rom_region("mcu54", 0x400, 0)
         berrn_rom_load("54xx.bin", 0x0000, 0x0400)
     berrn_rom_end
 

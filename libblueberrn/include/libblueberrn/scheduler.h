@@ -38,22 +38,22 @@ namespace berrn
 	return 0;
     }
 
-    inline int64_t time_in_hz(int64_t hz)
+    inline int64_t time_in_hz(double hz)
     {
-	return (1e6 / hz);
+	return int64_t(1e6 / hz);
     }
 
-    inline int64_t time_in_usec(int64_t usec)
+    inline int64_t time_in_usec(int usec)
     {
 	return usec;
     }
 
-    inline int64_t time_in_sec(int64_t sec)
+    inline int64_t time_in_sec(int sec)
     {
 	return (sec * 1e6);
     }
 
-    inline int64_t time_in_msec(int64_t msec)
+    inline int64_t time_in_msec(int msec)
     {
 	return (msec * 1000);
     }
@@ -114,9 +114,22 @@ namespace berrn
 		return;
 	    }
 
-	    virtual void fire_interrupt8(uint8_t opcode, bool is_line = true)
+	    virtual void fire_interrupt(bool is_line = true)
+	    {
+		(void)is_line;
+		return;
+	    }
+
+	    virtual void fire_interrupt8(uint8_t opcode = 0xFF, bool is_line = true)
 	    {
 		(void)opcode;
+		(void)is_line;
+		return;
+	    }
+
+	    virtual void fire_interrupt_level(int level, bool is_line = true)
+	    {
+		(void)level;
 		(void)is_line;
 		return;
 	    }
@@ -197,6 +210,11 @@ namespace berrn
 		return 0;
 	    }
 
+	    virtual bool isSeperateOps()
+	    {
+		return false;
+	    }
+
 	    virtual void writeCPU16(bool upper, bool lower, uint32_t addr, uint16_t val)
 	    {
 		cout << "Writing word to below address:" << endl;
@@ -226,9 +244,7 @@ namespace berrn
 	public:
 	    BerrnScheduler()
 	    {
-		current_fps = 60;
-		current_interleave = 1;
-		update_quantum();
+		set_quantum(time_in_hz(60));
 		current_time = 0;
 	    }
 
@@ -237,16 +253,9 @@ namespace berrn
 
 	    }
 
-	    void set_fps(int64_t fps)
+	    void set_quantum(int64_t quantum_val)
 	    {
-		current_fps = fps;
-		update_quantum();
-	    }
-
-	    void set_interleave(int64_t interleave)
-	    {
-		current_interleave = interleave;
-		update_quantum();
+		quantum_time = quantum_val;
 	    }
 
 	    void reset()
@@ -346,14 +355,6 @@ namespace berrn
 	    int64_t get_time_next_timer();
 
 	private:
-	    void update_quantum()
-	    {
-		quantum_time = ((1e6 / current_fps) / current_interleave);
-	    }
-
-	    int64_t current_fps = 0;
-	    int64_t current_interleave = 0;
-
 	    int64_t quantum_time = 0;
 	    int64_t current_time = 0;
 
@@ -511,6 +512,22 @@ namespace berrn
 		suspend_flags = resetbit(suspend_flags, int(reason));
 		processor.abort_timeslice();
 		processor.halt(false);
+	    }
+
+	    void set_reset_line(bool is_asserted)
+	    {
+		if (is_asserted)
+		{
+		    suspend(SuspendReason::Reset);
+		}
+		else
+		{
+		    if (is_suspended(SuspendReason::Reset))
+		    {
+			reset();
+			resume(SuspendReason::Reset);
+		    }
+		}
 	    }
 
 	    void stop_timeslice()

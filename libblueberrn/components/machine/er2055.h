@@ -16,30 +16,10 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef BERRN_PACMAN
-#define BERRN_PACMAN
+#ifndef LIBBLUEBERRN_ER2055_H
+#define LIBBLUEBERRN_ER2055_H
 
-#include <libblueberrn_api.h>
-#include <driver.h>
-using namespace berrn;
-using namespace std;
+#include "er2055/er2055.h"
+using namespace er2055;
 
-namespace berrn
-{
-    class LIBBLUEBERRN_API driverpacman : public berrndriver
-    {
-	public:
-	    driverpacman();
-	    ~driverpacman();
-
-	    string drivername();
-
-	    bool drvinit();
-	    void drvshutdown();
-	    void drvrun();
-
-	    void keychanged(BerrnInput key, bool is_pressed);
-    };
-};
-
-#endif // BERRN_PACMAN
+#endif // LIBBLUEBERRN_ER2055_H

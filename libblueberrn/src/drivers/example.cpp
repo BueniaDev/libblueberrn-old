@@ -24,15 +24,20 @@ namespace berrn
     driverexample::driverexample()
     {
 	device = new BerrnNull();
-	sound_timer = new BerrnTimer("Sound", scheduler, [&](int64_t, int64_t) {
-	    mixSample(getRawSample());
-	    outputAudio();
-	});
+	audio = new samplesdevice(*this);
+	bitmap = new BerrnBitmapRGB(640, 480);
+	bitmap->clear();
     }
 
     driverexample::~driverexample()
     {
 
+    }
+
+    void driverexample::process_audio()
+    {
+	auto samples = audio->fetch_samples();
+	add_stereo_sample(samples[0], samples[1]);
     }
 
     string driverexample::drivername()
@@ -47,42 +52,29 @@ namespace berrn
 
     bool driverexample::drvinit()
     {
-	scheduler.reset();
-	scheduler.add_device(device);
-	device->reset();
-	sample_val = loadWAV("loop.wav");
-
-	if (sample_val != -1)
-	{
-	    setSoundLoop(sample_val, true);
-	    playSound(sample_val);
-	}
-
-	bitmap = new BerrnBitmapRGB(640, 480);
 	bitmap->fillcolor(red());
+	audio->init();
 
-	resize(640, 480, 1);
-	sound_timer->start(time_in_hz(getSampleRate()), true);
+	sample_val = audio->load_sample("loop.wav");
+
+	audio->set_sound_loop(sample_val, true);
+	audio->play_sound(sample_val);
+
+	get_scheduler().add_device(device);
+	resize(640, 480);
 	return true;
     }
 
     void driverexample::drvshutdown()
     {
-	sound_timer->stop();
-	scheduler.shutdown();
+	audio->stop_sound(sample_val);
+	audio->shutdown();
     }
   
     void driverexample::drvrun()
     {
-	int64_t schedule_time = scheduler.get_current_time();
-	int64_t frame_time = time_in_hz(60);
-
-	while (scheduler.get_current_time() < (schedule_time + frame_time))
-	{
-	    scheduler.timeslice();
-	}
-
-	setScreen(bitmap);
+	run_scheduler();
+	set_screen(bitmap);
     }
 
     void driverexample::keychanged(BerrnInput key, bool is_pressed)

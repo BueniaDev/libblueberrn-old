@@ -1,0 +1,3 @@
+set(ER2055_HEADERS
+	"er2055.h"
+	PARENT_SCOPE)

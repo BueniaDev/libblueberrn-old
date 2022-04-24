@@ -78,8 +78,13 @@ class Berrn6502Processor : public BerrnProcessor
 
 	void reset()
 	{
-	    // TODO: Implement reset function in Bee6502
+	    // TODO: Implement reset function in Bee6502 engine
 	    core.init();
+	}
+
+	void fire_interrupt(bool is_line = true)
+	{
+	   core.fire_irq(is_line);
 	}
 
 	int64_t get_exec_time()
@@ -108,7 +113,7 @@ class Berrn6502Processor : public BerrnProcessor
 		}
 		else
 		{
-		    debug_output();
+		    // debug_output();
 		    cycles_left -= core.runinstruction();
 		}
 	    }

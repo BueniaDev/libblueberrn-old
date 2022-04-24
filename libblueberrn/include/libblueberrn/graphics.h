@@ -31,6 +31,16 @@ using namespace std;
 
 namespace berrn
 {
+    #define berrn_swapxy (1 << 2)
+    #define berrn_flipy (1 << 1)
+    #define berrn_flipx (1 << 0)
+
+    #define berrn_rot_mask  0x7
+    #define berrn_rot_0     0
+    #define berrn_rot_90    (berrn_swapxy | berrn_flipx)
+    #define berrn_rot_180   (berrn_flipx | berrn_flipy)
+    #define berrn_rot_270   (berrn_swapxy | berrn_flipy)
+
     struct berrnRGBA
     {
 	union
@@ -66,8 +76,7 @@ namespace berrn
 	{
 	    if (index >= 4)
 	    {
-		cout << "Error: Color index out of bounds" << endl;
-		exit(0);
+		throw out_of_range("Color index out of bounds");
 	    }
 
 	    return raw[index];
@@ -150,6 +159,202 @@ namespace berrn
     {
 	return berrnRGBA(red, green, blue, alpha);
     }
+
+    enum BerrnPaletteFormat
+    {
+	R8G8B8,
+	R8G8B8A8,
+	XBGR_555
+    };
+
+    class BerrnPalette
+    {
+	public:
+	    BerrnPalette(BerrnPaletteFormat format, size_t num_entries, size_t num_bytes) : format_(format), num_entries_(num_entries), num_bytes_(num_bytes)
+	    {
+		palette_ram.resize(numBytes(), 0);
+		colors.resize(numEntries(), black());
+	    }
+
+	    virtual ~BerrnPalette()
+	    {
+		colors.clear();
+		palette_ram.clear();
+	    }
+
+	    BerrnPaletteFormat format() const
+	    {
+		return format_;
+	    }
+
+	    size_t numEntries() const
+	    {
+		return num_entries_;
+	    }
+
+	    size_t numBytes() const
+	    {
+		return (numEntries() * numBytesPerEntry());
+	    }
+
+	    uint8_t read8(size_t offs)
+	    {
+		if (!inRange(offs, 0, numBytes()))
+		{
+		    return 0;
+		}
+
+		return palette_ram.at(offs);
+	    }
+
+	    void write8(size_t offs, uint8_t data)
+	    {
+		if (!inRange(offs, 0, numBytes()))
+		{
+		    return;
+		}
+
+		palette_ram.at(offs) = data;
+		updateColor(offs);
+	    }
+
+	    size_t numBytesPerEntry() const
+	    {
+		return num_bytes_;
+	    }
+
+	    berrnRGBA getColor(size_t offs)
+	    {
+		if (!inRange(offs, 0, numEntries()))
+		{
+		    stringstream ss;
+		    ss << "Invalid entry offset of " << dec << offs;
+		    throw out_of_range(ss.str());
+		}
+
+		return colors.at(offs);
+	    }
+
+	protected:
+	    uint16_t read16LE(size_t offs)
+	    {
+		uint8_t low = read8(offs);
+		uint8_t high = read8(offs + 1);
+
+		return ((high << 8) | low);
+	    }
+
+	    virtual berrnRGBA convertColor(size_t offs) = 0;
+
+	private:
+	    BerrnPaletteFormat format_;
+	    size_t num_entries_;
+	    size_t num_bytes_;
+
+	    void updateColor(size_t offs)
+	    {
+		if (numBytesPerEntry() == 0)
+		{
+		    throw out_of_range("Invalid number of bytes per entry");
+		}
+
+		size_t entry_offs = (offs / numBytesPerEntry());
+		colors.at(entry_offs) = convertColor(entry_offs);
+	    }
+
+	    vector<uint8_t> palette_ram;
+	    vector<berrnRGBA> colors;
+    };
+
+    class BerrnPaletteR8G8B8 : public BerrnPalette
+    {
+	public:
+	    BerrnPaletteR8G8B8(size_t num_entries) : BerrnPalette(R8G8B8, num_entries, 3)
+	    {
+
+	    }
+
+	    ~BerrnPaletteR8G8B8()
+	    {
+
+	    }
+
+	    berrnRGBA convertColor(size_t offs)
+	    {
+		if (!inRange(offs, 0, numEntries()))
+		{
+		    return black();
+		}
+
+		size_t color_offs = (offs * 3);
+
+		int red = read8(color_offs);
+		int green = read8(color_offs + 1);
+		int blue = read8(color_offs + 2);
+
+		return fromRGB(red, green, blue);
+	    }
+    };
+
+    class BerrnPaletteR8G8B8A8 : public BerrnPalette
+    {
+	public:
+	    BerrnPaletteR8G8B8A8(size_t num_entries) : BerrnPalette(R8G8B8A8, num_entries, 4)
+	    {
+
+	    }
+
+	    ~BerrnPaletteR8G8B8A8()
+	    {
+
+	    }
+
+	    berrnRGBA convertColor(size_t offs)
+	    {
+		if (!inRange(offs, 0, numEntries()))
+		{
+		    return black();
+		}
+
+		size_t color_offs = (offs * 4);
+
+		int red = read8(color_offs);
+		int green = read8(color_offs + 1);
+		int blue = read8(color_offs + 2);
+		int alpha = read8(color_offs + 3);
+
+		return fromRGBA(red, green, blue, alpha);
+	    }
+    };
+
+    class BerrnPaletteXBGR555 : public BerrnPalette
+    {
+	public:
+	    BerrnPaletteXBGR555(size_t num_entries) : BerrnPalette(XBGR_555, num_entries, 2)
+	    {
+
+	    }
+
+	    berrnRGBA convertColor(size_t offs)
+	    {
+		if (!inRange(offs, 0, numEntries()))
+		{
+		    return black();
+		}
+
+		uint16_t color_val = read16LE(offs * 2);
+
+		int red_val = (color_val & 0x1F);
+		int green_val = ((color_val >> 5) & 0x1F);
+		int blue_val = ((color_val >> 10) & 0x1F);
+
+		int red = ((red_val << 3) | (red_val >> 2));
+		int green = ((green_val << 3) | (green_val >> 2));
+		int blue = ((blue_val << 3) | (blue_val >> 2));
+
+		return fromRGB(red, green, blue);
+	    }
+    };
 
     enum BerrnBitmapFormat
     {
@@ -248,6 +453,55 @@ namespace berrn
 	    vector<berrnRGBA> framebuffer;
     };
 
+    inline BerrnBitmap* rotateBitmapRGB(BerrnBitmapRGB *bmp, int rot_flags)
+    {
+	if (bmp == NULL)
+	{
+	    return NULL;
+	}
+
+	int bmp_width = bmp->width();
+	int bmp_height = bmp->height();
+
+	int width = bmp_width;
+	int height = bmp_height;
+
+	bool is_swapxy = (rot_flags & berrn_swapxy);
+
+	if (rot_flags & berrn_swapxy)
+	{
+	    swap(width, height);
+	}
+
+	bool is_flipx = (rot_flags & berrn_flipx);
+	bool is_flipy = (rot_flags & berrn_flipy);
+
+	BerrnBitmapRGB *bitmap = new BerrnBitmapRGB(width, height);
+	bitmap->clear();
+
+	for (int x = 0; x < bmp_width; x++)
+	{
+	    int xpos = is_flipx ? x : ((bmp_width - 1) - x);
+	    for (int y = 0; y < bmp_height; y++)
+	    {
+		int ypos = is_flipy ? y : ((bmp_height - 1) - y);
+
+		berrnRGBA pixel = bmp->pixel(x, y);
+
+		if (is_swapxy)
+		{
+		    bitmap->setPixel(ypos, xpos, pixel);
+		}
+		else
+		{
+		    bitmap->setPixel(xpos, ypos, pixel);
+		}
+	    }
+	}
+
+	return bitmap;
+    }
+
     #define gfx_step2(start, step) start, (start + step)
     #define gfx_step4(start, step) gfx_step2(start, step), gfx_step2((start + (2 * step)), step)
     #define gfx_step8(start, step) gfx_step4(start, step), gfx_step4((start + (4 * step)), step)
@@ -308,14 +562,6 @@ namespace berrn
 	    dst_offs += buf_delta;
 	}
     }
-
-    enum BerrnRotation : int
-    {
-	None = 0,
-	Rot90 = 1,
-	Rot180 = 2,
-	Rot270 = 3,
-    };
 };
 
 #endif // BERRN_GFX_H

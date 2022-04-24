@@ -75,9 +75,12 @@ class Berrn8080Processor : public BerrnProcessor
 
 	}
 
-	void fire_interrupt(uint8_t opcode)
+	void fire_interrupt8(uint8_t opcode = 0xFF, bool is_line = true)
 	{
-	    core.setinterrupt(opcode);
+	    if (is_line)
+	    {
+		core.setinterrupt(opcode);
+	    }
 	}
 
 	void init()
@@ -107,7 +110,7 @@ class Berrn8080Processor : public BerrnProcessor
 	    current_cycles = static_cast<int64_t>(clock_freq * us / 1e6);
 	    cycles_left = current_cycles;
 
-	    while (cycles_left > 0)
+	    do
 	    {
 		if (is_stopped)
 		{
@@ -118,6 +121,7 @@ class Berrn8080Processor : public BerrnProcessor
 		    cycles_left -= core.runinstruction();
 		}
 	    }
+	    while (cycles_left > 0);
 
 	    return get_exec_time();
 	}

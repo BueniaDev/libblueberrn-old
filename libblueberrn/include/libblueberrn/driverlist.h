@@ -40,6 +40,10 @@ namespace berrn
 	    DRIVER(rastan);
 	    DRIVER(centiped);
 	    DRIVER(1942);
+	    DRIVER(1943u);
+	    DRIVER(tmnt);
+	    DRIVER(xmen);
+	    DRIVER(ddonpach);
 	}
     };
 };

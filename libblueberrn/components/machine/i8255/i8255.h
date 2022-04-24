@@ -126,7 +126,7 @@ namespace i8255
 			{
 			    outputs[1] = data;
 
-			    // TODO: Implement I8255 callback functions
+			    // TODO: Implement remaining I8255 callback functions
 			    cout << "Writing value of " << hex << int(data) << " to I8255 port B" << endl;
 			    if (port_b_write)
 			    {

@@ -16,48 +16,59 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef LIBBLUEBERRN_MB14241_SHIFTER_H
-#define LIBBLUEBERRN_MB14241_SHIFTER_H
+#ifndef LIBBLUEBERRN_AY8910_H
+#define LIBBLUEBERRN_AY8910_H
 
-#include <cstdint>
-#include <iostream>
-using namespace std;
+#include <driver.h>
+#include <psg/BeePSG/BeePSG/ay8910/ay8910.h>
+using namespace beepsg;
+using namespace berrn;
 
-namespace mb14241
+namespace berrn
 {
-    class mb14241shifter
+    class ay8910device : public berrnaudiodevice
     {
 	public:
-	    mb14241shifter() : shiftoffs(0), shiftval(0)
+	    ay8910device(berrndriver &drv) : berrnaudiodevice(drv)
 	    {
 
 	    }
 
-	    ~mb14241shifter()
+	    void init_device()
 	    {
-
+		audio_core.init();
+		cout << "AY8910::Initialized..." << endl;
 	    }
 
-	    void setshiftoffs(uint8_t val)
+	    void shutdown()
 	    {
-		shiftoffs = (val & 0x07);
+		cout << "AY8910::Shutting down..." << endl;
 	    }
 
-	    void fillshiftreg(uint8_t val)
+	    uint32_t get_clock_rate(uint32_t clk_rate)
 	    {
-		shiftval >>= 8;
-		shiftval |= (val << 8);
+		return audio_core.get_sample_rate(clk_rate);
 	    }
 
-	    uint8_t readshiftresult()
+	    void writeIO(int port, uint8_t data)
 	    {
-		return (shiftval >> (8 - shiftoffs));
+		audio_core.writeIO(port, data);
+	    }
+
+	    void clock_chip()
+	    {
+		audio_core.clock_chip();
+	    }
+
+	    vector<int32_t> get_samples()
+	    {
+		return audio_core.get_samples();
 	    }
 
 	private:
-	    int shiftoffs = 0;
-	    uint16_t shiftval = 0;
+	    AY8910 audio_core;
     };
 };
 
-#endif // LIBBLUEBERRN_MB14241_SHIFTER_H
+
+#endif // LIBBLUEBERRN_AY8910_H

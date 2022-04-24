@@ -22,39 +22,52 @@
 #include <libblueberrn_api.h>
 #include <driver.h>
 #include <cpu/motorola68k.h>
-#include <iostream>
-#include <string>
 using namespace berrn;
 using namespace std;
 
 namespace berrn
 {
-    class LIBBLUEBERRN_API RastanCore : public BerrnInterface
+    class RastanCore;
+
+    class RastanM68K : public BerrnInterface
+    {
+	public:
+	    RastanM68K(berrndriver &drv, RastanCore &core);
+	    ~RastanM68K();
+
+	    void init();
+	    void shutdown();
+
+	    uint16_t readCPU16(bool upper, bool lower, uint32_t addr);
+	    void writeCPU16(bool upper, bool lower, uint32_t addr, uint16_t data);
+
+	private:
+	    vector<uint8_t> main_rom;
+	    array<uint8_t, 0x4000> main_ram;
+
+
+	    berrndriver &driver;
+	    RastanCore &main_core;
+    };
+
+    class LIBBLUEBERRN_API RastanCore
     {
 	public:
 	    RastanCore(berrndriver &drv);
 	    ~RastanCore();
 
 	    bool init_core();
-	    void shutdown_core();
+	    void stop_core();
 	    void run_core();
-
-	    // Motorola 68000 memory functions
-	    uint16_t readCPU16(bool upper, bool lower, uint32_t addr);
-	    void writeCPU16(bool upper, bool lower, uint32_t addr, uint16_t data);
 
 	private:
 	    berrndriver &driver;
 
-	    BerrnScheduler scheduler;
+	    RastanM68K *main_inter = NULL;
 	    BerrnM68KProcessor *main_proc = NULL;
 	    BerrnCPU *main_cpu = NULL;
 
-	    // Placeholder bitmap
-	    BerrnBitmapRGB *bitmap = NULL;
-
-	    vector<uint8_t> m68k_rom;
-	    array<uint8_t, 0x4000> m68k_ram;
+	    BerrnTimer *vblank_timer = NULL;
     };
 
     class LIBBLUEBERRN_API driverrastan : public berrndriver
@@ -64,7 +77,6 @@ namespace berrn
 	    ~driverrastan();
 
 	    string drivername();
-	    bool hasdriverROMs();
 
 	    bool drvinit();
 	    void drvshutdown();

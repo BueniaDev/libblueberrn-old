@@ -16,8 +16,10 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "system1.h"
+#include <system1.h>
 using namespace berrn;
+using namespace std;
+using namespace std::placeholders;
 
 namespace berrn
 {
@@ -36,10 +38,19 @@ namespace berrn
     // (which is providing Zilog Z80 emulation for libblueberrn) for customizable
     // pre-scalers for both original Z80 cycles and opcode fetch cycles.
 
-    Sys1MainInterface::Sys1MainInterface()
+    berrn_rom_start(wboy2u)
+	berrn_rom_region("maincpu", 0x10000, 0)
+	    berrn_rom_load("ic129_02.bin", 0x0000, 0x2000)
+	    berrn_rom_load("ic130_03.bin", 0x2000, 0x2000)
+	    berrn_rom_load("ic131_04.bin", 0x4000, 0x2000)
+	    berrn_rom_load("ic132_05.bin", 0x6000, 0x2000)
+	    berrn_rom_load("epr-7591.133", 0x8000, 0x2000)
+	    berrn_rom_load("epr-7592.134", 0xA000, 0x2000)
+    berrn_rom_end
+
+    Sys1MainInterface::Sys1MainInterface(berrndriver &drv, SegaSystem1 &core) : driver(drv), main_core(core)
     {
-	framebitmap = new BerrnBitmapRGB(512, 224);
-	framebitmap->clear();
+
     }
 
     Sys1MainInterface::~Sys1MainInterface()
@@ -49,19 +60,33 @@ namespace berrn
 
     void Sys1MainInterface::init()
     {
-	vram.fill(0);
-	pram.fill(0);
-	mainram.fill(0);
+	main_rom = driver.get_rom_region("maincpu");
+	main_ram.fill(0);
     }
 
     void Sys1MainInterface::shutdown()
     {
-	return;
+	main_rom.clear();
     }
 
     uint8_t Sys1MainInterface::readCPU8(uint16_t addr)
     {
-	return readByte(addr);
+	uint8_t data = 0;
+
+	if (addr < 0xC000)
+	{
+	    data = main_rom.at(addr);
+	}
+	else if (addr < 0xD000)
+	{
+	    data = main_ram.at((addr & 0xFFF));
+	}
+	else
+	{
+	    data = BerrnInterface::readCPU8(addr);
+	}
+
+	return data;
     }
 
     void Sys1MainInterface::writeCPU8(uint16_t addr, uint8_t data)
@@ -72,19 +97,7 @@ namespace berrn
 	}
 	else if (addr < 0xD000)
 	{
-	    mainram[(addr & 0xFFF)] = data;
-	}
-	else if (addr < 0xD800)
-	{
-	    oam[(addr & 0x7FF)] = data;
-	}
-	else if (addr < 0xE000)
-	{
-	    pram[(addr & 0x7FF)] = data;
-	}
-	else if (addr < 0xF000)
-	{
-	    vram[(addr & 0xFFF)] = data;
+	    main_ram.at((addr & 0xFFF)) = data;
 	}
 	else
 	{
@@ -92,109 +105,59 @@ namespace berrn
 	}
     }
 
-    uint8_t Sys1MainInterface::readOp8(uint16_t addr)
-    {
-	return readByte(addr);
-    }
-
-    uint8_t Sys1MainInterface::portIn(uint16_t port)
-    {
-	uint8_t temp = 0x00;
-
-	if (inputcb)
-	{
-	    temp = inputcb((port & 0x1F));
-	}
-	else
-	{
-	    temp = BerrnInterface::portIn(port);
-	}
-
-	return temp;
-    }
-
     void Sys1MainInterface::portOut(uint16_t port, uint8_t data)
     {
-	if (outputcb)
-	{
-	    outputcb((port & 0x1F), data);
-	}
+	main_core.portOut((port & 0x1F), data);
     }
 
-    uint8_t Sys1MainInterface::readByte(uint16_t addr)
+    SegaSystem1::SegaSystem1(berrndriver &drv) : driver(drv)
     {
-	uint8_t data = 0;
-	if (addr < 0x8000)
-	{
-	    data = gamerom.at(addr);
-	}
-	else if (addr < 0xC000)
-	{
-	    data = gamerom.at(addr);
-	}
-	else if (addr < 0xD000)
-	{
-	    data = mainram[(addr & 0xFFF)];
-	}
-	else if (addr < 0xE000)
-	{
-	    cout << "Reading byte from address of " << hex << int(addr) << endl;
-	    exit(0);
-	}
-	else if (addr < 0xF000)
-	{
-	    data = vram[(addr & 0xFFF)];
-	}
-	else
-	{
-	    cout << "Reading byte from address of " << hex << int(addr) << endl;
-	    exit(0);
-	}
+	auto &scheduler = driver.get_scheduler();
+	scheduler.set_quantum(time_in_hz(6000));
 
-	return data;
-    }
+	main_inter = new Sys1MainInterface(driver, *this);
 
-    void Sys1MainInterface::writeVideoMode(uint8_t data)
-    {
-	if (testbit(data, 7))
-	{
-	    cout << "Screen is flipped" << endl;
-	}
-	else
-	{
-	    cout << "Screen is normal" << endl;
-	}
-
-	is_screen_blank = testbit(data, 4);
-    }
-
-    void Sys1MainInterface::updatePixels()
-    {
-	if (is_screen_blank)
-	{
-	    framebitmap->fillcolor(black());
-	    return;
-	}
-
-	framebitmap->fillcolor(red());
-    }
-
-    SegaSys1PPI::SegaSys1PPI()
-    {
-	scheduler.set_interleave(100);
 	// 20 mHz is not really the actual clock rate of the main Z80
 	// (see notes for details)
-	main_proc = new BerrnZ80Processor(20000000, main_inter);
+	main_proc = new BerrnZ80Processor(20000000, *main_inter);
 	main_proc->set_prescalers(5, 2); // See notes for details
 	main_cpu = new BerrnCPU(scheduler, *main_proc);
+    }
 
-	interrupt_timer = new BerrnTimer("IRQMain", scheduler, [&](int64_t, int64_t) {
-	    interruptHandler(0);
-	});
+    SegaSystem1::~SegaSystem1()
+    {
 
-	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t) {
-	    main_inter.updatePixels();
-	});
+    }
+
+    bool SegaSystem1::init_core()
+    {
+	auto &scheduler = driver.get_scheduler();
+	scheduler.add_device(main_cpu);
+	main_inter->init();
+	main_proc->init();
+	return true;
+    }
+
+    void SegaSystem1::stop_core()
+    {
+	main_inter->shutdown();
+	main_proc->shutdown();
+    }
+
+    void SegaSystem1::run_core()
+    {
+	driver.run_scheduler();
+    }
+
+    void SegaSystem1::portOut(uint16_t addr, uint8_t data)
+    {
+	cout << "Writing value of " << hex << int(data) << " to Sega System 1 port of " << hex << int(addr) << endl;
+	exit(0);
+    }
+
+    SegaSys1PPI::SegaSys1PPI(berrndriver &drv) : SegaSystem1(drv)
+    {
+
     }
 
     SegaSys1PPI::~SegaSys1PPI()
@@ -202,116 +165,24 @@ namespace berrn
 
     }
 
-    void SegaSys1PPI::init()
+    bool SegaSys1PPI::init_core()
     {
-	scheduler.reset();
-	scheduler.add_device(main_cpu);
-	main_proc->init();
-
-	main_inter.setinputcallback([&](int addr) -> uint8_t {
-	    return readInput(addr);
-	});
-
-	main_inter.setoutputcallback([&](int addr, uint8_t data) -> void {
-	    writeOutput(addr, data);
-	});
-
-	main_inter.init();
 	main_ppi.init();
-	main_ppi.set_out_portb_callback([&](uint8_t data) -> void {
-	    writeVideoMode(data);
+	main_ppi.set_out_portb_callback([&](uint8_t data) -> void
+	{
+	    cout << "Writing value of " << hex << int(data) << " to video mode register" << endl;
 	});
 
-	interrupt_timer->start(time_in_hz(60), true);
-	return;
+	return SegaSystem1::init_core();
     }
 
-    void SegaSys1PPI::interruptHandler(int param)
-    {
-	if (param == 0)
-	{
-	    main_proc->fire_interrupt8(0xFF); // RST 38H
-	}
-    }
-
-    void SegaSys1PPI::writeVideoMode(uint8_t data)
-    {
-	main_inter.writeVideoMode(data);
-    }
-
-    void SegaSys1PPI::shutdown()
+    void SegaSys1PPI::stop_core()
     {
 	main_ppi.shutdown();
-	main_inter.shutdown();
-	main_proc->shutdown();
-	scheduler.shutdown();
+	SegaSystem1::stop_core();
     }
 
-    void SegaSys1PPI::run()
-    {
-	int64_t schedule_time = scheduler.get_current_time();
-
-	int64_t frame_time = time_in_hz(60);
-
-	while (scheduler.get_current_time() < (schedule_time + frame_time))
-	{
-	    scheduler.timeslice();
-	}
-    }
-
-    uint8_t SegaSys1PPI::readInput(int addr)
-    {
-	uint8_t temp = 0;
-
-	switch (addr)
-	{
-	    case 0x00:
-	    {
-		// TODO: Implement P1 reads
-		cout << "Reading P1..." << endl;
-		temp = 0xFF;
-	    }
-	    break;
-	    case 0x04:
-	    {
-		// TODO: Implement P2 reads
-		cout << "Reading P2..." << endl;
-		temp = 0xFF;
-	    }
-	    break;
-	    case 0x08:
-	    {
-		// TODO: Implement SYSTEM reads
-		cout << "Reading SYSTEM..." << endl;
-		temp = 0xFF;
-	    }
-	    break;
-	    case 0x0C:
-	    {
-		// TODO: Implement SWA reads
-		cout << "Reading SWA..." << endl;
-		temp = 0x00;
-	    }
-	    break;
-	    case 0x10:
-	    {
-		// TODO: Implement SWB reads
-		cout << "Reading SWB..." << endl;
-		temp = 0x00;
-	    }
-	    break;
-	    default:
-	    {
-		cout << "Reading from System 1 PPI port of " << hex << int(addr) << endl;
-		exit(0);
-	    }
-	    break;
-	}
-
-	return temp;
-    }
-
-    void SegaSys1PPI::writeOutput(int addr, uint8_t data)
+    void SegaSys1PPI::portOut(uint16_t addr, uint8_t data)
     {
 	switch (addr)
 	{
@@ -325,7 +196,7 @@ namespace berrn
 
     driverwboy2u::driverwboy2u()
     {
-
+	core = new SegaSys1PPI(*this);
     }
 
     driverwboy2u::~driverwboy2u()
@@ -338,41 +209,29 @@ namespace berrn
 	return "wboy2u";
     }
 
-    bool driverwboy2u::hasdriverROMs()
+    string driverwboy2u::parentname()
     {
-	return true;
-    }
-
-    void driverwboy2u::loadROMs()
-    {
-	/*
-	loadROM("ic129_02.bin", 0x0000, 0x2000, core_sys1.get_main_rom());
-	loadROM("ic130_03.bin", 0x2000, 0x2000, core_sys1.get_main_rom());
-	loadROM("ic131_04.bin", 0x4000, 0x2000, core_sys1.get_main_rom());
-	loadROM("ic132_05.bin", 0x6000, 0x2000, core_sys1.get_main_rom());
-	loadROM("epr-7591.133", 0x8000, 0x2000, core_sys1.get_main_rom());
-	loadROM("epr-7591.133", 0xA000, 0x2000, core_sys1.get_main_rom());
-	loadROM("pr-5317.76", 0x0000, 0x0100, core_sys1.get_lookup_prom());
-	*/
+	return "wboy";
     }
 
     bool driverwboy2u::drvinit()
     {
-	// loadROMs();
-	core_sys1.init();
-	resize(640, 480, 1);
-	return false;
+	if (!loadROM(berrn_rom_name(wboy2u)))
+	{
+	    return false;
+	}
+
+	return core->init_core();
     }
 
     void driverwboy2u::drvshutdown()
     {
-	core_sys1.shutdown();
+	core->stop_core();
     }
   
     void driverwboy2u::drvrun()
     {
-	core_sys1.run();
-	setScreen(core_sys1.getBitmap());
+	core->run_core();
     }
 
     void driverwboy2u::keychanged(BerrnInput key, bool is_pressed)

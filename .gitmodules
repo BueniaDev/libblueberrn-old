@@ -16,3 +16,6 @@
 [submodule "libblueberrn/components/cpu/m6502/Bee6502"]
 	path = libblueberrn/components/cpu/m6502/Bee6502
 	url = https://github.com/BueniaDev/Bee6502.git
+[submodule "libblueberrn/components/audio/psg/BeePSG"]
+	path = libblueberrn/components/audio/psg/BeePSG
+	url = https://github.com/BueniaDev/BeePSG.git

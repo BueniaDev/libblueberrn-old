@@ -28,5 +28,9 @@
 #include <rastan.h>
 #include <centipede.h>
 #include <1942.h>
+#include <1943.h>
+#include <tmnt.h>
+#include <xmen.h>
+#include <cave.h>
 
 #endif // BERRN_DRIVERS

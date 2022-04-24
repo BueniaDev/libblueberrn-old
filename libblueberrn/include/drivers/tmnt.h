@@ -16,84 +16,71 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef BERRN_SYS1
-#define BERRN_SYS1
+#ifndef BERRN_TMNT
+#define BERRN_TMNT
 
 #include <libblueberrn_api.h>
 #include <driver.h>
-#include <cpu/zilogz80.h>
-#include <machine/i8255.h>
+#include <cpu/motorola68k.h>
 using namespace berrn;
 using namespace std;
 
 namespace berrn
 {
-    class SegaSystem1;
+    class TMNTCore;
 
-    class LIBBLUEBERRN_API Sys1MainInterface : public BerrnInterface
+    class LIBBLUEBERRN_API TMNTM68K : public BerrnInterface
     {
 	public:
-	    Sys1MainInterface(berrndriver &drv, SegaSystem1 &core);
-	    ~Sys1MainInterface();
+	    TMNTM68K(berrndriver &drv, TMNTCore &core);
+	    ~TMNTM68K();
 
 	    void init();
 	    void shutdown();
 
-	    uint8_t readCPU8(uint16_t addr);
-	    void writeCPU8(uint16_t addr, uint8_t data);
-	    void portOut(uint16_t port, uint8_t data);
+	    uint16_t readCPU16(bool upper, bool lower, uint32_t addr);
+	    void writeCPU16(bool upper, bool lower, uint32_t addr, uint16_t data);
 
 	private:
-	    berrndriver &driver;
-	    SegaSystem1 &main_core;
-
 	    vector<uint8_t> main_rom;
-	    array<uint8_t, 0x1000> main_ram;
-    };
-
-    class LIBBLUEBERRN_API SegaSystem1
-    {
-	public:
-	    SegaSystem1(berrndriver &drv);
-	    ~SegaSystem1();
-
-	    virtual bool init_core();
-	    virtual void stop_core();
-	    void run_core();
-
-	    virtual void portOut(uint16_t addr, uint8_t data);
-
-	private:
+	    array<uint8_t, 0x4000> main_ram;
 	    berrndriver &driver;
-	    Sys1MainInterface *main_inter = NULL;
-
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    TMNTCore &main_core;
     };
 
-    class LIBBLUEBERRN_API SegaSys1PPI : public SegaSystem1
+    class LIBBLUEBERRN_API TMNTCore : public BerrnInterface
     {
 	public:
-	    SegaSys1PPI(berrndriver &drv);
-	    ~SegaSys1PPI();
+	    TMNTCore(berrndriver &drv);
+	    ~TMNTCore();
 
 	    bool init_core();
 	    void stop_core();
+	    void run_core();
 
-	    void portOut(uint16_t addr, uint8_t data);
+	    uint8_t readPalette(uint32_t addr);
+	    void writePalette(uint32_t addr, uint8_t data);
+	    void write0A0000(uint16_t data);
+	    uint16_t readk052109_noA12(bool upper, bool lower, uint32_t addr);
+	    void writek052109_noA12(bool upper, bool lower, uint32_t addr, uint16_t data);
 
 	private:
-	    i8255ppi main_ppi;
+	    berrndriver &driver;
+
+	    TMNTM68K *main_inter = NULL;
+	    BerrnM68KProcessor *main_proc = NULL;
+	    BerrnCPU *main_cpu = NULL;
+
+	    BerrnPaletteXBGR555 *palette = NULL;
     };
 
-    class LIBBLUEBERRN_API driverwboy2u : public berrndriver
+    class LIBBLUEBERRN_API drivertmnt : public berrndriver
     {
 	public:
-	    driverwboy2u();
-	    ~driverwboy2u();
+	    drivertmnt();
+	    ~drivertmnt();
 
 	    string drivername();
-	    string parentname();
 
 	    bool drvinit();
 	    void drvshutdown();
@@ -102,8 +89,8 @@ namespace berrn
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    SegaSys1PPI *core = NULL;
+	    TMNTCore *core = NULL;
     };
 };
 
-#endif // BERRN_SYS1
+#endif // BERRN_TMNT

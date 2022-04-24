@@ -19,6 +19,8 @@
 #ifndef BERRN_UTILS_H
 #define BERRN_UTILS_H
 
+#include <iostream>
+#include <string>
 #include <cstdint>
 #include <functional>
 using namespace std;
@@ -65,6 +67,18 @@ namespace berrn
     {
 	int val = int(value);
 	return ((val >= low) && (val < high));
+    }
+
+    template<typename T>
+    bool inRangeEx(T value, int low, int high)
+    {
+	int val = int(value);
+	return ((val >= low) && (val <= high));
+    }
+
+    inline uint32_t convertAddr16(bool lower, uint32_t addr)
+    {
+	return ((addr & ~1) | lower);
     }
 };
 

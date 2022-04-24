@@ -53,10 +53,9 @@ class BerrnM68KInterface : public BotsashiInterface
 	    return false;
 	}
 
-	void trapException(int val, Botsashi &m68k)
+	void trapException(int val)
 	{
 	    (void)val;
-	    (void)m68k;
 	    return;
 	}
 
@@ -86,7 +85,6 @@ class BerrnM68KProcessor : public BerrnProcessor
 	void init()
 	{
 	    core.init();
-	    core.reset_exception();
 	}
 
 	void shutdown()
@@ -96,7 +94,12 @@ class BerrnM68KProcessor : public BerrnProcessor
 
 	void reset()
 	{
-	    core.reset_exception();
+	    core.reset();
+	}
+
+	void fire_interrupt_level(int level, bool is_line = true)
+	{
+	    core.fire_irq(level, is_line);
 	}
 
 	int64_t get_exec_time()
@@ -117,7 +120,7 @@ class BerrnM68KProcessor : public BerrnProcessor
 	    current_cycles = static_cast<int64_t>(clock_freq * us / 1e6);
 	    cycles_left = current_cycles;
 
-	    while (cycles_left > 0)
+	    do
 	    {
 		if (is_stopped)
 		{
@@ -126,18 +129,10 @@ class BerrnM68KProcessor : public BerrnProcessor
 		else
 		{
 		    // core.debugoutput();
-		    int cycles = core.executenextinstr();
-
-		    /*
-		    if (cycles == 0)
-		    {
-			cout << "Instruction has unimplemented cycle timings" << endl;
-			exit(0);
-		    }
-		    */
-		    cycles_left -= cycles;
+		    cycles_left -= core.executenextinstr();
 		}
 	    }
+	    while (cycles_left > 0);
 
 	    return get_exec_time();
 	}

@@ -28,56 +28,65 @@ using namespace std;
 
 namespace berrn
 {
-    class berrn1942video
+    class LIBBLUEBERRN_API berrn1942video
     {
 	public:
 	    berrn1942video(berrndriver &drv);
 	    ~berrn1942video();
 
-	    bool init();
+	    void init();
 	    void shutdown();
 
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t data);
+	    void updatePixels();
 
-	    uint8_t readSprites(uint16_t addr);
-	    void writeSprites(uint16_t addr, uint8_t data);
+	    uint8_t readBG(uint16_t addr);
+	    void writeBG(uint16_t addr, uint8_t data);
+
+	    uint8_t readFG(uint16_t addr);
+	    void writeFG(uint16_t addr, uint8_t data);
+
+	    uint8_t readOBJ(uint16_t addr);
+	    void writeOBJ(uint16_t addr, uint8_t data);
 
 	    void setScroll(bool is_msb, uint8_t data);
 	    void setPaletteBank(uint8_t data);
 
-	    void update_pixels();
-
 	private:
 	    berrndriver &driver;
-	    BerrnBitmapRGB *bitmap = NULL;
 
-	    array<uint8_t, 0x800> fg_vram;
-	    array<uint8_t, 0x400> bg_vram;
-	    array<uint8_t, 0x80> sprite_ram;
+	    array<uint8_t, 0x80> obj_ram;
+	    array<uint8_t, 0x800> fg_ram;
+	    array<uint8_t, 0x400> bg_ram;
+
+	    BerrnBitmapRGB *bitmap = NULL;
 
 	    void init_palette();
 
+	    void updateBackground();
+	    void updateSprites();
+	    void updateForeground();
+
+	    void drawBGTile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord, bool flipx, bool flipy);
+	    void drawFGTile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord);
+	    void drawSprite(uint32_t sprite_num, uint32_t pal_num, int xcoord, int ycoord);
+
+	    uint16_t scroll_x = 0;
 	    int palette_bank = 0;
 
-	    vector<uint8_t> bg_rom;
-	    vector<uint8_t> fg_rom;
+	    vector<uint8_t> bg_tiles;
 
-	    array<uint8_t, 256> fg_pal;
+	    vector<uint8_t> fg_tiles;
+
+	    vector<uint8_t> obj_tiles;
+
 	    array<array<uint8_t, 256>, 4> bg_pal;
+	    array<uint8_t, 256> fg_pal;
+	    array<uint8_t, 256> obj_pal;
 
 	    array<berrnRGBA, 256> colors;
 
-	    vector<uint8_t> bg_ram;
-	    vector<uint8_t> fg_ram;
-
-	    void update_background();
-	    void update_foreground();
-
-	    uint16_t scroll_x = 0;
-
-	    void draw_bg_tile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord, bool xflip, bool yflip);
-	    void draw_fg_tile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord);
+	    int clip_min = 0;
+	    int clip_max = 0;
     };
 };
 

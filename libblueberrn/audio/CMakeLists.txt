@@ -1,6 +1,8 @@
 add_subdirectory(wsg)
+
 set(AUDIO_HEADERS
 	${WSG_HEADERS}
+	libblueberrn/audio/samples.h
 	libblueberrn/audio/wsg.h
 	libblueberrn/audio/namco54.h
 	PARENT_SCOPE)

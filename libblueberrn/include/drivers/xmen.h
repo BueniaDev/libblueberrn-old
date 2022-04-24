@@ -16,59 +16,75 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef BERRN_GALAXIAN
-#define BERRN_GALAXIAN
+#ifndef BERRN_XMEN
+#define BERRN_XMEN
 
 #include <libblueberrn_api.h>
 #include <driver.h>
 #include <iostream>
 #include <string>
-#include <cpu/zilogz80.h>
-#include <video/galaxian.h>
+#include <cpu/motorola68k.h>
 using namespace berrn;
 using namespace std;
 
 namespace berrn
 {
-    class LIBBLUEBERRN_API GalaxianCore : public BerrnInterface
+    class XMenCore;
+
+    class XMenM68K : public BerrnInterface
     {
 	public:
-	    GalaxianCore(berrndriver &drv);
-	    ~GalaxianCore();
+	    XMenM68K(berrndriver &drv, XMenCore &core);
+	    ~XMenM68K();
 
-	    bool initcore();
-	    void stopcore();
-	    void runcore();
+	    void init();
+	    void shutdown();
 
-	    uint8_t readCPU8(uint16_t addr);
-	    void writeCPU8(uint16_t addr, uint8_t data);
+	    uint16_t readCPU16(bool upper, bool lower, uint32_t addr);
+	    void writeCPU16(bool upper, bool lower, uint32_t addr, uint16_t data);
+
+	private:
+	    berrndriver &driver;
+	    XMenCore &main_core;
+
+	    vector<uint8_t> main_rom;
+	    array<uint8_t, 0x4000> main_ram;
+    };
+
+    class XMenCore
+    {
+	public:
+	    XMenCore(berrndriver &drv);
+	    ~XMenCore();
+
+	    bool init_core();
+	    void stop_core();
+	    void run_core();
+
+	    void writeIRQ(bool line);
 
 	private:
 	    berrndriver &driver;
 
-	    vector<uint8_t> main_rom;
-	    array<uint8_t, 0x400> main_ram;
-
-	    void writeIOUpper(int reg, bool line);
-
-	    bool irq_enable = false;
-
-	    BerrnZ80Processor *main_proc = NULL;
+	    XMenM68K *main_inter = NULL;
+	    BerrnM68KProcessor *main_proc = NULL;
 	    BerrnCPU *main_cpu = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
+	    BerrnTimer *irq_timer = NULL;
 
-	    galaxianvideo *video = NULL;
+	    int current_scanline = 0;
+
+	    bool is_vblank_irq = false;
     };
 
-    class LIBBLUEBERRN_API drivergalaxian : public berrndriver
+    class LIBBLUEBERRN_API driverxmen : public berrndriver
     {
 	public:
-	    drivergalaxian();
-	    ~drivergalaxian();
+	    driverxmen();
+	    ~driverxmen();
 
 	    string drivername();
-	    uint32_t get_flags();
 
 	    bool drvinit();
 	    void drvshutdown();
@@ -77,9 +93,9 @@ namespace berrn
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    GalaxianCore *core = NULL;
+	    XMenCore *core = NULL;
     };
 };
 
 
-#endif // BERRN_GALAXIAN
+#endif // BERRN_XMEN

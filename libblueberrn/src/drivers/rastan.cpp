@@ -16,13 +16,15 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "rastan.h"
+#include <rastan.h>
 using namespace berrn;
+using namespace std;
+using namespace std::placeholders;
 
 namespace berrn
 {
     berrn_rom_start(rastan)
-	berrn_rom_region("maincpu", 0x60000)
+	berrn_rom_region("maincpu", 0x60000, 0)
 	    berrn_rom_load16_byte("b04-38.19",  0x00000, 0x10000)
 	    berrn_rom_load16_byte("b04-37.7",   0x00001, 0x10000)
 	    berrn_rom_load16_byte("b04-40.20",  0x20000, 0x10000)
@@ -31,67 +33,40 @@ namespace berrn
 	    berrn_rom_load16_byte("b04-43-1.9", 0x40001, 0x10000)
     berrn_rom_end
 
-    RastanCore::RastanCore(berrndriver &drv) : driver(drv)
-    {
-	scheduler.set_interleave(10);
-	main_proc = new BerrnM68KProcessor(8000000, *this);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
-
-	bitmap = new BerrnBitmapRGB(320, 240);
-	bitmap->clear();
-    }
-
-    RastanCore::~RastanCore()
+    RastanM68K::RastanM68K(berrndriver &drv, RastanCore &core) : driver(drv), main_core(core)
     {
 
     }
 
-    bool RastanCore::init_core()
+    RastanM68K::~RastanM68K()
     {
-	m68k_rom = driver.get_rom_region("maincpu");
-	scheduler.reset();
-	scheduler.add_device(main_cpu);
-	main_proc->init();
 
-	driver.resize(320, 240, 2);
-
-	return true;
     }
 
-    void RastanCore::shutdown_core()
+    void RastanM68K::init()
     {
-	main_proc->shutdown();
-	scheduler.shutdown();
+	main_rom = driver.get_rom_region("maincpu");
+	main_ram.fill(0);
     }
 
-    void RastanCore::run_core()
+    void RastanM68K::shutdown()
     {
-	int64_t schedule_time = scheduler.get_current_time();
-
-	int64_t frame_time = time_in_hz(60);
-
-	while (scheduler.get_current_time() < (schedule_time + frame_time))
-	{
-	    scheduler.timeslice();
-	}
-
-	// Placeholder code
-	driver.setScreen(bitmap);
+	main_rom.clear();
     }
 
-    uint16_t RastanCore::readCPU16(bool upper, bool lower, uint32_t addr)
+    uint16_t RastanM68K::readCPU16(bool upper, bool lower, uint32_t addr)
     {
 	uint16_t data = 0;
 	if (addr < 0x60000)
 	{
 	    if (upper)
 	    {
-		data |= (m68k_rom.at(addr) << 8);
+		data |= (main_rom.at(addr) << 8);
 	    }
 
 	    if (lower)
 	    {
-		data |= m68k_rom.at(addr + 1);
+		data |= main_rom.at(addr + 1);
 	    }
 	}
 	else if (inRange(addr, 0x10C000, 0x110000))
@@ -100,18 +75,45 @@ namespace berrn
 
 	    if (upper)
 	    {
-		data |= (m68k_ram.at(ram_addr) << 8);
+		data |= (main_ram.at(ram_addr) << 8);
 	    }
 
 	    if (lower)
 	    {
-		data |= m68k_ram.at(ram_addr + 1);
+		data |= main_ram.at(ram_addr + 1);
 	    }
 	}
 	else if (inRange(addr, 0x200000, 0x201000))
 	{
 	    /*
 	    cout << "Reading palette RAM..." << endl;
+	    cout << "Upper: " << dec << int(upper) << endl;
+	    cout << "Lower: " << dec << int(lower) << endl;
+	    cout << "Address: " << hex << int(addr) << endl;
+	    cout << endl;
+	    */
+	    data = 0x0000;
+	}
+	else if (addr == 0x390008)
+	{
+	    // DSWA
+	    if (lower)
+	    {
+		data = 0xFE;
+	    }
+	}
+	else if (addr == 0x39000A)
+	{
+	    // DSWB
+	    if (lower)
+	    {
+		data = 0xFF;
+	    }
+	}
+	else if (inRange(addr, 0xC00000, 0xC10000))
+	{
+	    /*
+	    cout << "Taito PC080SN word read" << endl;
 	    cout << "Upper: " << dec << int(upper) << endl;
 	    cout << "Lower: " << dec << int(lower) << endl;
 	    cout << "Address: " << hex << int(addr) << endl;
@@ -127,7 +129,7 @@ namespace berrn
 	return data;
     }
 
-    void RastanCore::writeCPU16(bool upper, bool lower, uint32_t addr, uint16_t data)
+    void RastanM68K::writeCPU16(bool upper, bool lower, uint32_t addr, uint16_t data)
     {
 	if (addr < 0x60000)
 	{
@@ -139,12 +141,12 @@ namespace berrn
 
 	    if (upper)
 	    {
-		m68k_ram.at(ram_addr) = (data >> 8);
+		main_ram.at(ram_addr) = (data >> 8);
 	    }
 
 	    if (lower)
 	    {
-		m68k_ram.at(ram_addr + 1) = (data & 0xFF);
+		main_ram.at(ram_addr + 1) = (data & 0xFF);
 	    }
 	}
 	else if (inRange(addr, 0x200000, 0x201000))
@@ -199,10 +201,43 @@ namespace berrn
 
 	    // cout << "Writing value of " << hex << int((data & 0xFF)) << " to Taito PC060HA master communication port" << endl;
 	}
+	else if (inRange(addr, 0xC00000, 0xC10000))
+	{
+	    /*
+	    cout << "Taito PC080SN word write" << endl;
+	    cout << "Upper: " << dec << int(upper) << endl;
+	    cout << "Lower: " << dec << int(lower) << endl;
+	    cout << "Address: " << hex << int(addr) << endl;
+	    cout << "Data: " << hex << int(data) << endl;
+	    cout << endl;
+	    */
+	}
+	else if (inRange(addr, 0xC20000, 0xC20004))
+	{
+	    /*
+	    cout << "Taito PC080SN y-scroll word write" << endl;
+	    cout << "Upper: " << dec << int(upper) << endl;
+	    cout << "Lower: " << dec << int(lower) << endl;
+	    cout << "Address: " << hex << int(addr) << endl;
+	    cout << "Data: " << hex << int(data) << endl;
+	    cout << endl;
+	    */
+	}
+	else if (inRange(addr, 0xC40000, 0xC40004))
+	{
+	    /*
+	    cout << "Taito PC080SN x-scroll word write" << endl;
+	    cout << "Upper: " << dec << int(upper) << endl;
+	    cout << "Lower: " << dec << int(lower) << endl;
+	    cout << "Address: " << hex << int(addr) << endl;
+	    cout << "Data: " << hex << int(data) << endl;
+	    cout << endl;
+	    */
+	}
 	else if (inRange(addr, 0xC50000, 0xC50004))
 	{
 	    /*
-	    cout << "Taito PC080SN write" << endl;
+	    cout << "Taito PC080SN control word write" << endl;
 	    cout << "Upper: " << dec << int(upper) << endl;
 	    cout << "Lower: " << dec << int(lower) << endl;
 	    cout << "Address: " << hex << int(addr) << endl;
@@ -227,6 +262,52 @@ namespace berrn
 	}
     }
 
+    RastanCore::RastanCore(berrndriver &drv) : driver(drv)
+    {
+	auto &scheduler = driver.get_scheduler();
+
+	scheduler.set_quantum(time_in_hz(600));
+
+	main_inter = new RastanM68K(driver, *this);
+
+	main_proc = new BerrnM68KProcessor(8000000, *main_inter);
+	main_cpu = new BerrnCPU(scheduler, *main_proc);
+
+	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
+	{
+	    main_proc->fire_interrupt_level(5);
+	});
+    }
+
+    RastanCore::~RastanCore()
+    {
+
+    }
+
+    bool RastanCore::init_core()
+    {
+	auto &scheduler = driver.get_scheduler();
+	main_inter->init();
+	main_proc->init();
+	scheduler.add_device(main_cpu);
+	vblank_timer->start(time_in_hz(60), true);
+	driver.resize(320, 240, 2);
+
+	return true;
+    }
+
+    void RastanCore::stop_core()
+    {
+	vblank_timer->stop();
+	main_inter->shutdown();
+	main_proc->shutdown();
+    }
+
+    void RastanCore::run_core()
+    {
+	driver.run_scheduler();
+    }
+
     driverrastan::driverrastan()
     {
 	core = new RastanCore(*this);
@@ -242,11 +323,6 @@ namespace berrn
 	return "rastan";
     }
 
-    bool driverrastan::hasdriverROMs()
-    {
-	return true;
-    }
-
     bool driverrastan::drvinit()
     {
 	if (!loadROM(berrn_rom_name(rastan)))
@@ -259,9 +335,9 @@ namespace berrn
 
     void driverrastan::drvshutdown()
     {
-	core->shutdown_core();
+	core->stop_core();
     }
-
+  
     void driverrastan::drvrun()
     {
 	core->run_core();
@@ -274,4 +350,3 @@ namespace berrn
 	return;
     }
 };
-

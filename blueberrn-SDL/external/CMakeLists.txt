@@ -3,9 +3,6 @@ find_package(SDL2 REQUIRED)
 set(ZIP_SOURCES
 	zip/zip.c)
 
-set(CMIXER_SOURCES
-	cmixer/cmixer.c)
-
 set(IMGUI_SOURCES
 	imgui/imgui.cpp
 	imgui/imgui_draw.cpp
@@ -39,6 +36,3 @@ target_include_directories(zip PUBLIC
 
 add_library(toml INTERFACE)
 target_include_directories(toml INTERFACE toml/)
-
-add_library(cmixer STATIC ${CMIXER_SOURCES})
-target_include_directories(cmixer PUBLIC cmixer/)

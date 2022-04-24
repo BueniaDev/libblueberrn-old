@@ -22,189 +22,105 @@ using namespace berrn;
 namespace berrn
 {
     berrn_rom_start(galaxian)
-	berrn_rom_region("cpu", 0x4000)
+	berrn_rom_region("maincpu", 0x4000, 0)
 	    berrn_rom_load("galmidw.u", 0x0000, 0x0800)
 	    berrn_rom_load("galmidw.v", 0x0800, 0x0800)
 	    berrn_rom_load("galmidw.w", 0x1000, 0x0800)
 	    berrn_rom_load("galmidw.y", 0x1800, 0x0800)
-	    berrn_rom_load("7l", 0x2000, 0x0800)
-	berrn_rom_region("gfx", 0x1000)
-	    berrn_rom_load("1h.bin", 0x0000, 0x0800)
-	    berrn_rom_load("1k.bin", 0x0800, 0x0800)
-	berrn_rom_region("pal", 0x0020)
-	    berrn_rom_load("6l.bpr", 0x0000, 0x0020)
+	    berrn_rom_load("7l",        0x2000, 0x0800)
+	berrn_rom_region("gfx", 0x1000, 0)
+	    berrn_rom_load("1h.bin",    0x0000, 0x0800)
+	    berrn_rom_load("1k.bin",    0x0800, 0x0800)
+	berrn_rom_region("pal", 0x0020, 0)
+	    berrn_rom_load("6l.bpr",    0x0000, 0x0020)
     berrn_rom_end
 
-    GalaxianInterface::GalaxianInterface(berrndriver &drv) : driver(drv)
+    GalaxianCore::GalaxianCore(berrndriver &drv) : driver(drv)
     {
+	auto &scheduler = driver.get_scheduler();
+
 	main_proc = new BerrnZ80Processor(3072000, *this);
 	main_cpu = new BerrnCPU(scheduler, *main_proc);
 
-	video_core = new galaxianvideo(driver);
+	video = new galaxianvideo(driver);
 
-	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t) {
-	    update_pixels();
-	});
-
-	interrupt_timer = new BerrnTimer("Interrupt", scheduler, [&](int64_t param, int64_t)
+	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
 	{
-	    if (param == 1)
+	    if (irq_enable)
 	    {
-		interrupt_timer->start(16500, true);
+		main_proc->fire_nmi(true);
 	    }
 
-	    if (is_int_enabled)
-	    {
-		main_proc->fire_nmi();
-	    }
+	    video->updatePixels();
 	});
     }
 
-    GalaxianInterface::~GalaxianInterface()
+    GalaxianCore::~GalaxianCore()
     {
 
     }
 
-    bool GalaxianInterface::init_core()
+    bool GalaxianCore::initcore()
     {
-	scheduler.reset();
-	scheduler.add_device(main_cpu);
 	main_proc->init();
+	main_rom = driver.get_rom_region("maincpu");
+	main_ram.fill(0);
 
-	video_core->init();
+	video->init();
 
-	vblank_timer->start(16500, true);
-	interrupt_timer->start(14000, false, 1);
-
-	driver.resize(224, 256, 2);
-	ram.fill(0);
-
-	// Reset IO enable registers
-	for (int i = 0; i < 8; i++)
-	{
-	    write_upperIO(i, 0);
-	}
-
-	game_rom = driver.get_rom_region("cpu");
-
-	port0_val = 0;
-	port1_val = 0;
-
+	auto &scheduler = driver.get_scheduler();
+	scheduler.add_device(main_cpu);
+	vblank_timer->start(time_in_hz(60), true);
+	driver.resize(256, 224, 2);
 	return true;
     }
 
-    void GalaxianInterface::shutdown_core()
+    void GalaxianCore::stopcore()
     {
-	main_proc->shutdown();
-	video_core->shutdown();
-	interrupt_timer->stop();
 	vblank_timer->stop();
-	ram.fill(0);
-	scheduler.shutdown();
+	video->shutdown();
+	main_rom.clear();
+	main_proc->shutdown();
     }
 
-    void GalaxianInterface::run_core()
+    void GalaxianCore::runcore()
     {
-	int64_t schedule_time = scheduler.get_current_time();
-
-	int64_t frame_time = 16500;
-
-	while (scheduler.get_current_time() < (schedule_time + frame_time))
-	{
-	    scheduler.timeslice();
-	}
+	driver.run_scheduler();
     }
 
-    void GalaxianInterface::key_changed(BerrnInput key, bool is_pressed)
+    uint8_t GalaxianCore::readCPU8(uint16_t addr)
     {
-	switch (key)
-	{
-	    case BerrnInput::BerrnCoin:
-	    {
-		port0_val = changebit(port0_val, 0, is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnStartP1:
-	    {
-		port1_val = changebit(port1_val, 0, is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnLeftP1:
-	    {
-		port0_val = changebit(port0_val, 2, is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnRightP1:
-	    {
-		port0_val = changebit(port0_val, 3, is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnFireP1:
-	    {
-		port0_val = changebit(port0_val, 4, is_pressed);
-	    }
-	    break;
-	    default: break;
-	}
-    }
+	uint8_t data = 0xFF;
 
-    void GalaxianInterface::update_pixels()
-    {
-	video_core->update_pixels();
-    }
-
-    uint8_t GalaxianInterface::readCPU8(uint16_t addr)
-    {
-	return readByte(addr);
-    }
-
-    void GalaxianInterface::writeCPU8(uint16_t addr, uint8_t data)
-    {
-	writeByte(addr, data);
-    }
-
-    uint8_t GalaxianInterface::readOp8(uint16_t addr)
-    {
-	return readByte(addr);
-    }
-
-    uint8_t GalaxianInterface::readByte(uint16_t addr)
-    {
-	uint8_t data = 0;
 	if (addr < 0x4000)
 	{
-	    data = game_rom.at(addr);
+	    data = main_rom.at(addr);
 	}
-	else if (inRange(addr, 0x4000, 0x5000))
+	else if (inRange(addr, 0x4000, 0x4800))
 	{
-	    data = ram[(addr & 0x3FF)];
+	    data = main_ram.at(addr & 0x3FF);
 	}
-	else if (inRange(addr, 0x5000, 0x6000))
+	else if (inRange(addr, 0x5000, 0x5800))
 	{
-	    data = video_core->readByte(addr);
+	    data = video->readVRAM(addr);
+	}
+	else if (inRange(addr, 0x5800, 0x6000))
+	{
+	    data = video->readORAM(addr);
 	}
 	else if (inRange(addr, 0x6000, 0x6800))
 	{
-	    data = port0_val;
+	    // IN0
+	    data = 0x00;
 	}
 	else if (inRange(addr, 0x6800, 0x7000))
 	{
-	    data = port1_val;
+	    // IN1
+	    data = 0x00;
 	}
 	else if (inRange(addr, 0x7000, 0x7800))
 	{
-	    // IN2 port values
-	    //
-	    // Bits 0-1 - Bonus life at:
-	    // 0 = 7000 points
-	    // 1 = 10000 points
-	    // 2 = 12000 points
-	    // 3 = 20000 points
-	    //
-	    // Bit 2 - Number of lives per game:
-	    // 0 = 2 lives
-	    // 1 = 3 lives
-
+	    // IN2
 	    data = 0x04;
 	}
 	else if (inRange(addr, 0x7800, 0x8000))
@@ -214,78 +130,104 @@ namespace berrn
 	}
 	else
 	{
-	    data = 0xFF;
+	    data = BerrnInterface::readCPU8(addr);
 	}
 
 	return data;
     }
 
-    void GalaxianInterface::writeByte(uint16_t addr, uint8_t data)
+    void GalaxianCore::writeCPU8(uint16_t addr, uint8_t data)
     {
 	if (addr < 0x4000)
 	{
 	    return;
 	}
-	else if (inRange(addr, 0x4000, 0x5000))
+	else if (inRange(addr, 0x4000, 0x4800))
 	{
-	    ram[(addr & 0x3FF)] = data;
+	    main_ram.at(addr & 0x3FF) = data;
 	}
-	else if (inRange(addr, 0x5000, 0x6000))
+	else if (inRange(addr, 0x5000, 0x5800))
 	{
-	    video_core->writeByte(addr, data);
+	    video->writeVRAM(addr, data);
+	}
+	else if (inRange(addr, 0x5800, 0x6000))
+	{
+	    video->writeORAM(addr, data);
 	}
 	else if (inRange(addr, 0x6000, 0x6800))
 	{
-	    write_lowerIO((addr & 7), data);
+	    int io_select = (addr & 7);
+
+	    if (io_select >= 4)
+	    {
+		cout << "Writing value of " << hex << int(data) << " to Galaxian lower register of " << dec << int(io_select) << endl;
+	    }
 	}
 	else if (inRange(addr, 0x6800, 0x7000))
 	{
-	    cout << "Writing value of " << hex << int(data) << " to possible sound-write register of " << dec << int((addr & 0x7)) << endl;
+	    int io_select = (addr & 7);
+	    cout << "Writing value of " << hex << int(data) << " to Galaxian upper register of " << dec << int(io_select) << endl;
 	}
 	else if (inRange(addr, 0x7000, 0x7800))
 	{
-	    write_upperIO((addr & 7), data);
+	    writeIOUpper((addr & 7), testbit(data, 0));
 	}
 	else if (inRange(addr, 0x7800, 0x8000))
 	{
-	    cout << "Writing value of " << hex << int(data) << " to possible pitch-write register" << endl;
+	    cout << "Writing value of " << hex << int(data) << " to Galaxian $7800 register" << endl;
 	}
 	else
 	{
-	    return;
+	    BerrnInterface::writeCPU8(addr, data);
 	}
     }
 
-    void GalaxianInterface::write_lowerIO(int addr, uint8_t data)
+    void GalaxianCore::writeIOUpper(int reg, bool line)
     {
-	switch (addr)
+	switch (reg)
 	{
-	    case 0:
 	    case 1:
-	    case 2:
-	    case 3: return; break;
-	    default:
 	    {
-		cout << "Writing value of " << hex << int(data) << " to possible lfo-freq register of " << dec << int(addr) << endl; break;
+		irq_enable = line;
+
+		if (!irq_enable)
+		{
+		    main_proc->fire_nmi(false);
+		}
 	    }
 	    break;
-	}
-    }
-
-    void GalaxianInterface::write_upperIO(int addr, uint8_t data)
-    {
-	switch (addr)
-	{
-	    case 1: is_int_enabled = testbit(data, 0); break;
-	    case 4: video_core->update_latch(0, data); break;
-	    case 6: video_core->update_latch(1, data); break;
-	    case 7: video_core->update_latch(2, data); break;
+	    case 4: video->writeIO(0, line); break;
+	    case 6:
+	    {
+		if (line)
+		{
+		    cout << "X-flip enabled" << endl;
+		}
+		else
+		{
+		    cout << "X-flip disabled" << endl;
+		}
+	    }
+	    break;
+	    case 7:
+	    {
+		if (line)
+		{
+		    cout << "Y-flip enabled" << endl;
+		}
+		else
+		{
+		    cout << "Y-flip disabled" << endl;
+		}
+	    }
+	    break;
+	    default: break;
 	}
     }
 
     drivergalaxian::drivergalaxian()
     {
-	inter = new GalaxianInterface(*this);
+	core = new GalaxianCore(*this);
     }
 
     drivergalaxian::~drivergalaxian()
@@ -298,9 +240,9 @@ namespace berrn
 	return "galaxian";
     }
 
-    bool drivergalaxian::hasdriverROMs()
+    uint32_t drivergalaxian::get_flags()
     {
-	return true;
+	return berrn_rot_90;
     }
 
     bool drivergalaxian::drvinit()
@@ -310,26 +252,61 @@ namespace berrn
 	    return false;
 	}
 
-	return inter->init_core();
+	return core->initcore();
     }
 
     void drivergalaxian::drvshutdown()
     {
-	inter->shutdown_core();
+	core->stopcore();
     }
   
     void drivergalaxian::drvrun()
     {
-	inter->run_core();
-    }
-
-    float drivergalaxian::get_framerate()
-    {
-	return (16000.0 / 132.0 / 2.0); // Framerate is 60.606060 Hz
+	core->runcore();
     }
 
     void drivergalaxian::keychanged(BerrnInput key, bool is_pressed)
     {
-	inter->key_changed(key, is_pressed);
+	string key_state = (is_pressed) ? "pressed" : "released";
+
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		cout << "Coin button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		cout << "P1 start button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		cout << "P1 left button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		cout << "P1 right button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnUpP1:
+	    {
+		cout << "P1 up button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnDownP1:
+	    {
+		cout << "P1 down button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnFireP1:
+	    {
+		cout << "P1 fire button has been " << key_state << endl;
+	    }
+	    break;
+	    default: break;
+	}
     }
 };

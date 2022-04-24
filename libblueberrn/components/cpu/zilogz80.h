@@ -49,7 +49,7 @@ class BerrnZ80Interface : public BeeZ80Interface
 
 	bool isSeperateOps()
 	{
-	    return true;
+	    return inter.isSeperateOps();
 	}
 
 	uint8_t readOpcode(uint16_t addr)
@@ -85,9 +85,9 @@ class BerrnZ80Processor : public BerrnProcessor
 
 	}
 
-	void fire_nmi()
+	void fire_nmi(bool is_pending = true)
 	{
-	    core.generate_nmi();
+	    core.generate_nmi(is_pending);
 	}
 
 	void set_irq_vector(uint8_t opcode)
@@ -95,7 +95,7 @@ class BerrnZ80Processor : public BerrnProcessor
 	    core.generate_interrupt(opcode, is_irq_line);
 	}
 
-	void fire_interrupt8(uint8_t opcode, bool is_line = true)
+	void fire_interrupt8(uint8_t opcode = 0xFF, bool is_line = true)
 	{
 	    core.generate_interrupt(opcode, is_line);
 	    is_irq_line = is_line;
@@ -141,7 +141,7 @@ class BerrnZ80Processor : public BerrnProcessor
 	    current_cycles = static_cast<int64_t>(clock_freq * us / 1e6);
 	    cycles_left = current_cycles;
 
-	    while (cycles_left > 0)
+	    do
 	    {
 		if (is_stopped)
 		{
@@ -152,7 +152,8 @@ class BerrnZ80Processor : public BerrnProcessor
 		    cycles_left -= core.runinstruction();
 		}
 	    }
-	    
+	    while (cycles_left > 0);
+
 	    return get_exec_time();
 	}
 

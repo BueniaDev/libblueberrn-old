@@ -23,7 +23,6 @@
 #endif
 #include <imgui.h>
 #include <imgui_sdl.h>
-#include <cmixer.h>
 #include <zip.h>
 #include <toml.h>
 #include <iostream>
@@ -120,7 +119,7 @@ class SDL2Frontend : public BlueberrnFrontend
 		return sdl_error("Window could not be created!");
 	    }
 						
-	    render = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+	    render = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE | SDL_RENDERER_TARGETTEXTURE);
 				
 	    if (render == NULL)
 	    {
@@ -138,9 +137,6 @@ class SDL2Frontend : public BlueberrnFrontend
 	    {
 		return sdl_error("Could not open audio!");
 	    }
-
-	    cm_init(audiospec.freq);
-	    cm_set_master_gain(0.5);
 
 	    SDL_PauseAudio(!isdriverloaded);
 
@@ -345,6 +341,18 @@ class SDL2Frontend : public BlueberrnFrontend
 			set_current_language(French);
 		    }
 
+		    if (ImGui::MenuItem(u8"Deutsch"))
+		    {
+			cout << "Setting language to German..." << endl;
+			set_current_language(German);
+		    }
+
+		    if (ImGui::MenuItem(u8"Italiano..."))
+		    {
+			cout << "Setting language to Italian..." << endl;
+			set_current_language(Italian);
+		    }
+
 		    ImGui::EndMenu();
 		}
 
@@ -371,6 +379,10 @@ class SDL2Frontend : public BlueberrnFrontend
 			{
 			    case SDL_WINDOWEVENT_SIZE_CHANGED:
 			    {
+				int width = event.window.data1;
+				int height = event.window.data2;
+				iotemp.DisplaySize.x = float(width);
+				iotemp.DisplaySize.y = float(height);
 				SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
 				SDL_RenderClear(render);
 				SDL_RenderPresent(render);
@@ -500,8 +512,26 @@ class SDL2Frontend : public BlueberrnFrontend
 				
 	void resize(int w, int h, int s)
 	{
-	    width = w;
-	    height = h;
+	    auto driver = core->getDriver();
+
+	    int rot_flags = 0;
+
+	    if (driver != NULL)
+	    {
+		rot_flags = (driver->get_flags() & berrn_rot_mask);
+	    }
+
+	    if (rot_flags & berrn_swapxy)
+	    {
+		width = h;
+		height = w;
+	    }
+	    else
+	    {
+		width = w;
+		height = h;
+	    }
+
 	    scale = s;
 
 	    resizewindow();
@@ -509,9 +539,10 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	void drawpixels()
 	{
+	    auto driver = core->getDriver();
 	    SDL_RenderClear(render);
 
-	    BerrnBitmap *bitmap = core->getDriver()->getScreen();
+	    BerrnBitmap *bitmap = driver->get_screen();
 
 	    if (bitmap == NULL)
 	    {
@@ -589,12 +620,10 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	int loadzip(string filename)
 	{
-	    cout << "Loading ZIP file of " << filename << endl;
 	    struct zip_t *zip = zip_open(filename.c_str(), 0, 'r');
 
 	    if (zip == NULL)
 	    {
-		cout << "Error: could not load ZIP file" << endl;
 		return -1;
 	    }
 
@@ -612,7 +641,6 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	    if (!file.is_open())
 	    {
-		cout << "Unable to load file." << endl;
 		return temp;
 	    }
 
@@ -637,15 +665,29 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	    if (zip == NULL)
 	    {
-		cout << "Error: ZIP entry is NULL" << endl;
 		return temp;
 	    }
 
-	    int zipentry = zip_entry_open(zip, filename.c_str());
+	    string zip_filename = filename;
+
+	    int num_entries = zip_entries_total(zip);
+	    for (int i = 0; i < num_entries; i++)
+	    {
+		zip_entry_openbyindex(zip, i);
+		string zip_path = zip_entry_name(zip);
+		zip_entry_close(zip);
+		
+		if (zip_path.find(filename) != string::npos)
+		{
+		    zip_filename = zip_path;
+		    break;
+		}
+	    }
+
+	    int zipentry = zip_entry_open(zip, zip_filename.c_str());
 
 	    if (zipentry < 0)
 	    {
-		cout << "Error: could not open entry in ZIP file" << endl;
 		zip_entry_close(zip);
 		return temp;
 	    }
@@ -655,7 +697,6 @@ class SDL2Frontend : public BlueberrnFrontend
 	    temp.resize(bufsize, 0);
 
 	    zip_entry_noallocread(zip, temp.data(), temp.size());
-
 	    zip_entry_close(zip);
 	    return temp;
 	}
@@ -674,108 +715,13 @@ class SDL2Frontend : public BlueberrnFrontend
 	    zip_files.clear();
 	}
 
-	// Audio logic (samples logic powered by cmixer)
-	// TODO: Make overall audio API more robust
+	// Fetch external sample rate
 	uint32_t getSampleRate()
 	{
 	    return 48000;
 	}
 
-	int loadWAV(string filename)
-	{
-	    int id = samplesounds.size();
-
-	    cm_Source *src = cm_new_source_from_file(filename.c_str());
-
-	    if (src == NULL)
-	    {
-		cout << "Could not load " << filename << "! cm_error: " << cm_get_error() << endl;
-		return -1;
-	    }
-
-	    samplesounds.push_back(src);
-	    return id;
-	}
-
-	bool hasSounds()
-	{
-	    return !samplesounds.empty();
-	}
-
-	bool setSoundLoop(int id, bool is_loop)
-	{
-	    if ((id < 0) || (id >= int(samplesounds.size())))
-	    {
-		return false;
-	    }
-
-	    int loop_val = (is_loop) ? 1 : 0;
-	    cm_set_loop(samplesounds[id], loop_val);
-	    return true;
-	}
-
-	bool playSound(int id)
-	{
-	    if ((id < 0) || (id >= int(samplesounds.size())))
-	    {
-		return false;
-	    }
-
-	    cm_play(samplesounds[id]);
-	    return true;
-	}
-
-	bool stopSound(int id)
-	{
-	    if ((id < 0) || (id >= int(samplesounds.size())))
-	    {
-		return false;
-	    }
-
-	    cm_stop(samplesounds[id]);
-	    return true;
-	}
-
-	bool setSoundVol(int id, double vol)
-	{
-	    if ((id < 0) || (id >= int(samplesounds.size())))
-	    {
-		return false;
-	    }
-
-	    if ((vol < 0.0) || (vol > 1.0))
-	    {
-		return false;
-	    }
-
-	    cm_set_gain(samplesounds[id], vol);
-	    return true;
-	}
-
-	array<int16_t, 2> getMixedSamples()
-	{
-	    array<int16_t, 2> samples;
-	    cm_Int16 dst[2];
-	    cm_process(dst, 2);
-	    samples[0] = dst[0];
-	    samples[1] = dst[1];
-	    return samples;
-	}
-
-	void freeSounds()
-	{
-	    for (int id = 0; id < samplesounds.size(); id++)
-	    {
-		if (samplesounds[id] != NULL)
-		{
-		    cm_destroy_source(samplesounds[id]);
-		    samplesounds[id] = NULL;
-		}
-	    }
-
-	    samplesounds.clear();
-	}
-
+	// External audio callback
 	void audioCallback(array<int16_t, 2> samples)
 	{
 	    int16_t left = samples[0];
@@ -834,8 +780,6 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	Uint32 framecurrenttime = 0;
 	Uint32 framestarttime = 0;
-
-	vector<cm_Source*> samplesounds;
 
 	vector<int16_t> audiobuffer;
 

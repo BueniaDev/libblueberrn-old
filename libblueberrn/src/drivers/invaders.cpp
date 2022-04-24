@@ -24,7 +24,7 @@ using namespace std::placeholders;
 namespace berrn
 {
     berrn_rom_start(invaders)
-	berrn_rom_region("cpu", 0x2000)
+	berrn_rom_region("maincpu", 0x10000, 0)
 	    berrn_rom_load("invaders.h", 0x0000, 0x0800)
 	    berrn_rom_load("invaders.g", 0x0800, 0x0800)
 	    berrn_rom_load("invaders.f", 0x1000, 0x0800)
@@ -33,28 +33,24 @@ namespace berrn
 
     InvadersCore::InvadersCore(berrndriver &drv) : driver(drv)
     {
+	auto &scheduler = driver.get_scheduler();
+
 	main_proc = new Berrn8080Processor(2000000, *this);
 	main_cpu = new BerrnCPU(scheduler, *main_proc);
 
-	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t) {
-	    update_pixels();
+	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
+	{
+	    updatePixels();
 	});
 
-	interrupt_timer = new BerrnTimer("IRQ", scheduler, [&](int64_t, int64_t) {
+	irq_timer = new BerrnTimer("IRQ", scheduler, [&](int64_t, int64_t)
+	{
 	    uint8_t interrupt_op = (is_end_of_frame) ? 0xD7 : 0xCF;
-	    main_proc->fire_interrupt(interrupt_op);
+	    main_proc->fire_interrupt8(interrupt_op);
 	    is_end_of_frame = !is_end_of_frame;
 	});
 
-	sound_timer = new BerrnTimer("Sound", scheduler, [&](int64_t, int64_t)
-	{
-	    driver.mixSample(driver.getRawSample());
-	    driver.outputAudio();
-	});
-
-	port1_val = 0x01;
-
-	bitmap = new BerrnBitmapRGB(224, 256);
+	bitmap = new BerrnBitmapRGB(256, 224);
 	bitmap->clear();
     }
 
@@ -63,102 +59,87 @@ namespace berrn
 
     }
 
-    bool InvadersCore::init_core()
+    bool InvadersCore::initcore()
     {
-	main_rom = driver.get_rom_region("cpu");
-	scheduler.reset();
-	scheduler.add_device(main_cpu);
+	port1 = 0x00;
 	main_proc->init();
+	rom = driver.get_rom_region("maincpu");
+	auto &scheduler = driver.get_scheduler();
 
-	load_sound("0.wav"); // UFO (repeats)
-	load_sound("1.wav"); // Shot
-	load_sound("2.wav"); // Player explosion
-	load_sound("3.wav"); // Invaders explosion
-	load_sound("4.wav"); // Fleet movement 1
-	load_sound("5.wav"); // Fleet movement 2
-	load_sound("6.wav"); // Fleet movement 3
-	load_sound("7.wav"); // Fleet movement 4
-	load_sound("8.wav"); // UFO hit
-	load_sound("9.wav"); // Extended play
+	main_ram.fill(0);
+	video_ram.fill(0);
 
-	driver.setSoundLoop(sound_IDs[0], true);
-
+	scheduler.add_device(main_cpu);
 	vblank_timer->start(time_in_hz(60), true);
-	interrupt_timer->start(time_in_hz(120), true);
-	sound_timer->start(time_in_hz(driver.getSampleRate()), true);
-
-	driver.resize(224, 256, 2);
+	irq_timer->start(time_in_hz(120), true);
+	driver.resize(256, 224, 2);
 	return true;
     }
 
-    void InvadersCore::shutdown_core()
+    void InvadersCore::stopcore()
     {
-	work_ram.fill(0);
-	video_ram.fill(0);
-	main_proc->shutdown();
-	sound_timer->stop();
+	rom.clear();
 	vblank_timer->stop();
-	interrupt_timer->stop();
-	scheduler.shutdown();
-	bitmap->clear();
+	irq_timer->stop();
+	main_proc->shutdown();
     }
 
-    void InvadersCore::load_sound(string filename)
+    void InvadersCore::runcore()
     {
-	int sound_id = driver.loadWAV(filename);
-	driver.setSoundVol(sound_id, 0.25);
-	sound_IDs.push_back(sound_id);
+	driver.run_scheduler();
     }
 
-    void InvadersCore::run_core()
+    void InvadersCore::keychanged(BerrnInput key, bool is_pressed)
     {
-	int64_t schedule_time = scheduler.get_current_time();
-
-	int64_t frame_time = time_in_hz(60);
-
-	while (scheduler.get_current_time() < (schedule_time + frame_time))
+	switch (key)
 	{
-	    scheduler.timeslice();
-	}
-    }
-
-    void InvadersCore::update_pixels()
-    {
-	for (uint32_t addr = 0; addr < 0x1C00; addr++)
-	{
-	    int ypos = ((addr * 8) / 256);
-	    int base_x = ((addr * 8) % 256);
-
-	    uint8_t video_byte = video_ram.at(addr);
-
-	    for (int bit = 0; bit < 8; bit++)
+	    case BerrnInput::BerrnCoin:
 	    {
-		int xpos = (255 - (base_x + bit));
-		berrnRGBA color = testbit(video_byte, bit) ? white() : black();
-		bitmap->setPixel(ypos, xpos, color);
+		port1 = changebit(port1, 0, is_pressed);
 	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		port1 = changebit(port1, 2, is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		port1 = changebit(port1, 5, is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		port1 = changebit(port1, 6, is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnFireP1:
+	    {
+		port1 = changebit(port1, 4, is_pressed);
+	    }
+	    break;
+	    default: break;
 	}
-
-	driver.setScreen(bitmap);
     }
 
     uint8_t InvadersCore::readCPU8(uint16_t addr)
     {
-	addr &= 0x3FFF;
 	uint8_t data = 0;
+	addr &= 0x3FFF;
+
 	if (addr < 0x2000)
 	{
-	    data = main_rom.at(addr);
+	    data = rom.at(addr);
 	}
 	else if (addr < 0x2400)
 	{
-	    data = work_ram.at((addr - 0x2000));
+	    data = main_ram.at(addr - 0x2000);
 	}
 	else
 	{
-	    data = video_ram.at((addr - 0x2400));
+	    data = video_ram.at(addr - 0x2400);
 	}
-	
+
 	return data;
     }
 
@@ -172,11 +153,11 @@ namespace berrn
 	}
 	else if (addr < 0x2400)
 	{
-	    work_ram.at((addr - 0x2000)) = data;
+	    main_ram.at(addr - 0x2000) = data;
 	}
 	else
 	{
-	    video_ram.at((addr - 0x2400)) = data;
+	    video_ram.at(addr - 0x2400) = data;
 	}
     }
 
@@ -187,168 +168,60 @@ namespace berrn
 
 	switch (port)
 	{
-	    case 1: data = port1_val; break;
+	    case 0: data = 0x08; break;
+	    case 1: data = port1; break;
 	    case 2: data = 0x00; break;
 	    case 3: data = shifter.readshiftresult(); break;
-	    default: data = BerrnInterface::portIn(port); break;
 	}
 
 	return data;
     }
 
-    void InvadersCore::portOut(uint16_t port, uint8_t val)
+    void InvadersCore::portOut(uint16_t port, uint8_t data)
     {
 	port &= 7;
 
 	switch (port)
 	{
-	    case 2: shifter.setshiftoffs(val); break;
-	    case 3: write_sound_port(0, val); break;
-	    case 4: shifter.fillshiftreg(val); break;
-	    case 5: write_sound_port(1, val); break;
-	    case 6: /* debugPort(val); */ break;
-	    default: BerrnInterface::portOut(port, val); break;
+	    case 2: shifter.setshiftoffs(data); break;
+	    case 3: break;
+	    case 4: shifter.fillshiftreg(data); break;
+	    case 5: break;
+	    case 6: /* debugPort(data); */ break;
+	    default: BerrnInterface::portOut(port, data); break;
 	}
     }
 
-    bool InvadersCore::is_rising_edge(uint8_t data, uint8_t prev_data, int bit)
+    void InvadersCore::debugPort(uint8_t data)
     {
-	return (testbit(data, bit) && !testbit(prev_data, bit));
-    }
-
-    bool InvadersCore::is_falling_edge(uint8_t data, uint8_t prev_data, int bit)
-    {
-	return (!testbit(data, bit) && testbit(prev_data, bit));
-    }
-
-    void InvadersCore::write_sound_port(int bank, uint8_t data)
-    {
-	if (bank == 0)
-	{
-	    if (is_rising_edge(data, prev_port3, 0))
-	    {
-		play_sound(0, true);
-	    }
-	    else if (is_falling_edge(data, prev_port3, 0))
-	    {
-		play_sound(0, false);
-	    }
-
-	    if (is_rising_edge(data, prev_port3, 1))
-	    {
-		play_sound(1);
-	    }
-
-	    if (is_rising_edge(data, prev_port3, 2))
-	    {
-		play_sound(2);
-	    }
-
-	    if (is_rising_edge(data, prev_port3, 3))
-	    {
-		play_sound(3);
-	    }
-
-	    if (is_rising_edge(data, prev_port3, 4))
-	    {
-		play_sound(9);
-	    }
-
-	    prev_port3 = data;
-	}
-	else if (bank == 1)
-	{
-	    if (is_rising_edge(data, prev_port5, 0))
-	    {
-		play_sound(4);
-	    }
-
-	    if (is_rising_edge(data, prev_port5, 1))
-	    {
-		play_sound(5);
-	    }
-
-	    if (is_rising_edge(data, prev_port5, 2))
-	    {
-		play_sound(6);
-	    }
-
-	    if (is_rising_edge(data, prev_port5, 3))
-	    {
-		play_sound(7);
-	    }
-
-	    if (is_rising_edge(data, prev_port5, 4))
-	    {
-		play_sound(8);
-	    }
-
-	    prev_port5 = data;
-	}
-    }
-
-    void InvadersCore::play_sound(int id, bool is_playing)
-    {
-	auto sound_id = sound_IDs[id];
-
-	if (sound_id == -1)
-	{
-	    return;
-	}
-
-	if (is_playing)
-	{
-	    driver.playSound(sound_id);
-	}
-	else
-	{
-	    driver.stopSound(sound_id);
-	}
-    }
-
-    void InvadersCore::debugPort(uint8_t val)
-    {
-	char debug_char = (val <= 25) ? ('A' + val) : '\n';
+	char debug_char = (data <= 25) ? ('A' + data) : '\n';
 	cout.put(debug_char);
 	fflush(stdout);
     }
 
-    void InvadersCore::key_changed(BerrnInput key, bool is_pressed)
+    void InvadersCore::updatePixels()
     {
-	switch (key)
+	for (int i = 0; i < 0x1C00; i++)
 	{
-	    case BerrnInput::BerrnCoin:
+	    int ypos = ((i * 8) / 256);
+	    int base_x = ((i * 8) % 256);
+
+	    uint8_t vram_byte = video_ram.at(i);
+
+	    for (int bit = 0; bit < 8; bit++)
 	    {
-		port1_val = changebit(port1_val, 0, is_pressed);
+		int xpos = (base_x + bit);
+		berrnRGBA color = testbit(vram_byte, bit) ? white() : black();
+		bitmap->setPixel(xpos, ypos, color);
 	    }
-	    break;
-	    case BerrnInput::BerrnStartP1:
-	    {
-		port1_val = changebit(port1_val, 2, is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnLeftP1:
-	    {
-		port1_val = changebit(port1_val, 5, is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnRightP1:
-	    {
-		port1_val = changebit(port1_val, 6, is_pressed);
-	    }
-	    break;
-	    case BerrnInput::BerrnFireP1:
-	    {
-		port1_val = changebit(port1_val, 4, is_pressed);
-	    }
-	    break;
-	    default: break;
 	}
+
+	driver.set_screen(bitmap);
     }
 
     driverinvaders::driverinvaders()
     {
-	inv_core = new InvadersCore(*this);
+	core = new InvadersCore(*this);
     }
 
     driverinvaders::~driverinvaders()
@@ -361,9 +234,9 @@ namespace berrn
 	return "invaders";
     }
 
-    bool driverinvaders::hasdriverROMs()
+    uint32_t driverinvaders::get_flags()
     {
-	return true;
+	return berrn_rot_270;
     }
 
     bool driverinvaders::drvinit()
@@ -373,21 +246,21 @@ namespace berrn
 	    return false;
 	}
 
-	return inv_core->init_core();
+	return core->initcore();
     }
 
     void driverinvaders::drvshutdown()
     {
-	inv_core->shutdown_core();
+	core->stopcore();
     }
-
+  
     void driverinvaders::drvrun()
     {
-	inv_core->run_core();
+	core->runcore();
     }
 
     void driverinvaders::keychanged(BerrnInput key, bool is_pressed)
     {
-	inv_core->key_changed(key, is_pressed);
+	core->keychanged(key, is_pressed);
     }
 };
