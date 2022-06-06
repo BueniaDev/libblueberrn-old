@@ -113,7 +113,7 @@ namespace berrn
 		port1 = changebit(port1, 6, is_pressed);
 	    }
 	    break;
-	    case BerrnInput::BerrnFireP1:
+	    case BerrnInput::BerrnButton1P1:
 	    {
 		port1 = changebit(port1, 4, is_pressed);
 	    }

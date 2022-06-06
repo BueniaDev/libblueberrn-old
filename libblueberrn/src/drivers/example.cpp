@@ -45,11 +45,6 @@ namespace berrn
 	return "example";
     }
 
-    bool driverexample::hasdriverROMs()
-    {
-	return false;
-    }
-
     bool driverexample::drvinit()
     {
 	bitmap->fillcolor(red());
@@ -113,9 +108,9 @@ namespace berrn
 		cout << "P1 down button has been " << key_state << endl;
 	    }
 	    break;
-	    case BerrnInput::BerrnFireP1:
+	    case BerrnInput::BerrnButton1P1:
 	    {
-		cout << "P1 fire button has been " << key_state << endl;
+		cout << "P1 button 1 has been " << key_state << endl;
 	    }
 	    break;
 	    default: break;

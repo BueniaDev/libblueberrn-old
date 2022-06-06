@@ -394,25 +394,31 @@ class SDL2Frontend : public BlueberrnFrontend
 		    case SDL_KEYDOWN:
 		    case SDL_KEYUP:
 		    {
-			// blueberrn-SDL key mappings (similar to MAME):
+			// blueberrn-SDL key mappings:
+			// 2 - Service mode
 			// 5 - Insert credit
 			// 1 - P1 Start
 			// Left - P1 Left
 			// Right - P1 Right
 			// Up - P1 Up
 			// Down - P1 Down
-			// Left Ctrl - P1 Fire
+			// A - P1 Button 1
+			// B = P1 Button 2
+			// D = Dump (for debugging purposes)
 			bool is_pressed = (event.type == SDL_KEYDOWN);
 
 			switch (event.key.keysym.sym)
 			{
+			    case SDLK_2: core->keychanged(BerrnInput::BerrnService, is_pressed); break;
 			    case SDLK_5: core->keychanged(BerrnInput::BerrnCoin, is_pressed); break;
 			    case SDLK_1: core->keychanged(BerrnInput::BerrnStartP1, is_pressed); break;
 			    case SDLK_LEFT: core->keychanged(BerrnInput::BerrnLeftP1, is_pressed); break;
 			    case SDLK_RIGHT: core->keychanged(BerrnInput::BerrnRightP1, is_pressed); break;
 			    case SDLK_UP: core->keychanged(BerrnInput::BerrnUpP1, is_pressed); break;
 			    case SDLK_DOWN: core->keychanged(BerrnInput::BerrnDownP1, is_pressed); break;
-			    case SDLK_LCTRL: core->keychanged(BerrnInput::BerrnFireP1, is_pressed); break;
+			    case SDLK_a: core->keychanged(BerrnInput::BerrnButton1P1, is_pressed); break;
+			    case SDLK_b: core->keychanged(BerrnInput::BerrnButton2P1, is_pressed); break;
+			    case SDLK_d: core->keychanged(BerrnInput::BerrnDump, is_pressed); break;
 			}
 		    }
 		    break;
@@ -479,7 +485,6 @@ class SDL2Frontend : public BlueberrnFrontend
 	    }
 
 	    framestarttime = SDL_GetTicks();
-
 	    fpscount += 1;
 
 	    if (((SDL_GetTicks() - fpstime) >= 1000))
@@ -634,25 +639,73 @@ class SDL2Frontend : public BlueberrnFrontend
 	    return id;
 	}
 
-	vector<uint8_t> readfile(string filename)
+	vector<uint8_t> readfile(string dirname, string subdirname, string filename)
 	{
 	    vector<uint8_t> temp;
-	    ifstream file(filename.c_str(), ios::in | ios::binary | ios::ate);
+	    cout << "Reading file from local directory" << endl;
+	    cout << "Directory name: " << dirname << endl;
+	    cout << "Subdirectory name: " << subdirname << endl;
+	    cout << "Filename: " << filename << endl;
+	    cout << endl;
 
-	    if (!file.is_open())
+	    fs::path dir_path = dirname;
+
+	    vector<fs::path> target_paths = 
 	    {
-		return temp;
+		(dir_path / subdirname / filename),
+		(dir_path / filename),
+	    };
+
+	    for (auto &path : target_paths)
+	    {
+		if (fs::exists(path))
+		{
+		    return loadfile(path.generic_string());
+		}
 	    }
 
-	    streampos size = file.tellg();
-	    temp.resize(size, 0);
-	    file.seekg(0, ios::beg);
-	    file.read((char*)temp.data(), size);
-	    file.close();
+	    auto target_file = fs::path(filename);
+
+	    for (const auto &dir_entry : fs::recursive_directory_iterator(dir_path))
+	    {
+		auto path = dir_entry.path();
+		if (path.filename() == target_file.filename())
+		{
+		    return loadfile(path.generic_string());
+		}
+	    }
+
+	    for (const auto &dir_entry : fs::directory_iterator(dir_path))
+	    {
+		auto path = dir_entry.path();
+		if (path.extension() == target_file.extension())
+		{
+		    return loadfile(path.generic_string());
+		}
+	    }
+
 	    return temp;
 	}
 
-	vector<uint8_t> readfilefromzip(int id, string filename)
+	vector<uint8_t> loadfile(string filename)
+	{
+	    cout << "Loading file of " << filename << endl;
+	    vector<uint8_t> temp;
+	    ifstream file(filename, ios::in | ios::binary | ios::ate);
+
+	    if (file.is_open())
+	    {
+		streampos size = file.tellg();
+		temp.resize(size, 0);
+		file.seekg(0, ios::beg);
+		file.read((char*)temp.data(), temp.size());
+		file.close();
+	    }
+
+	    return temp;
+	}
+
+	vector<uint8_t> readfilefromzip(int id, string dirname, string filename)
 	{
 	    vector<uint8_t> temp;
 
@@ -661,44 +714,113 @@ class SDL2Frontend : public BlueberrnFrontend
 		return temp;
 	    }
 
-	    struct zip_t *zip = zip_files.at(id);
+	    auto zip_file = zip_files.at(id);
 
-	    if (zip == NULL)
+	    vector<fs::path> target_paths = 
 	    {
-		return temp;
-	    }
+		(fs::path(dirname) / filename),
+		fs::path(filename),
+	    };
 
-	    string zip_filename = filename;
-
-	    int num_entries = zip_entries_total(zip);
-	    for (int i = 0; i < num_entries; i++)
+	    for (auto &path : target_paths)
 	    {
-		zip_entry_openbyindex(zip, i);
-		string zip_path = zip_entry_name(zip);
-		zip_entry_close(zip);
-		
-		if (zip_path.find(filename) != string::npos)
+		if (is_zip_exists(zip_file, path))
 		{
-		    zip_filename = zip_path;
-		    break;
+		    return loadfilefromzip(zip_file, path.generic_string());
 		}
 	    }
 
-	    int zipentry = zip_entry_open(zip, zip_filename.c_str());
+	    auto target_file = fs::path(filename);
+	    fs::path file_path;
 
-	    if (zipentry < 0)
+	    if (find_file_in_zip(zip_file, target_file, file_path))
 	    {
-		zip_entry_close(zip);
-		return temp;
+		return loadfilefromzip(zip_file, file_path.generic_string());
 	    }
 
-	    size_t bufsize = zip_entry_size(zip);
-
-	    temp.resize(bufsize, 0);
-
-	    zip_entry_noallocread(zip, temp.data(), temp.size());
-	    zip_entry_close(zip);
 	    return temp;
+	}
+
+	bool is_zip_exists(struct zip_t *zip, fs::path path)
+	{
+	    if (zip == NULL)
+	    {
+		return false;
+	    }
+
+	    int num_entries = zip_entries_total(zip);
+
+	    for (int i = 0; i < num_entries; i++)
+	    {
+		zip_entry_openbyindex(zip, i);
+		fs::path file_name = fs::path(zip_entry_name(zip));
+		zip_entry_close(zip);
+
+		if (file_name == path)
+		{
+		    return true;
+		}
+	    }
+
+	    return false;
+	}
+
+	bool find_file_in_zip(struct zip_t *zip, fs::path target_path, fs::path &file_path)
+	{
+	    if (zip == NULL)
+	    {
+		return false;
+	    }
+
+	    int num_entries = zip_entries_total(zip);
+
+	    for (int i = 0; i < num_entries; i++)
+	    {
+		zip_entry_openbyindex(zip, i);
+		fs::path file_name = fs::path(zip_entry_name(zip));
+		zip_entry_close(zip);
+
+		if (file_name.filename() == target_path.filename())
+		{
+		    file_path = file_name;
+		    return true;
+		}
+	    }
+
+	    for (int i = 0; i < num_entries; i++)
+	    {
+		zip_entry_openbyindex(zip, i);
+		fs::path file_name = fs::path(zip_entry_name(zip));
+		zip_entry_close(zip);
+
+		if (!file_name.has_parent_path())
+		{
+		    if (file_name.extension() == target_path.extension())
+		    {
+			file_path = file_name;
+			return true;
+		    }
+		}
+	    }
+
+	    return false;
+	}
+
+	vector<uint8_t> loadfilefromzip(struct zip_t *zip, string filename)
+	{
+	    vector<uint8_t> data;
+
+	    if (zip == NULL)
+	    {
+		return data;
+	    }
+
+	    zip_entry_open(zip, filename.c_str());
+	    size_t buf_size = zip_entry_size(zip);
+	    data.resize(buf_size, 0);
+	    zip_entry_noallocread(zip, (void*)data.data(), data.size());
+	    zip_entry_close(zip);
+	    return data;
 	}
 
 	void closezip()
@@ -818,6 +940,7 @@ int main(int argc, char* argv[])
 		
     if (!core.startdriver(front->isdriverloaded))
     {
+	cout << "Error: could not load driver" << endl;
 	return 1;
     }
 		

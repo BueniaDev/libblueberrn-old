@@ -57,8 +57,8 @@ namespace berrn
 	    virtual void resize(int width, int height, int scale) = 0;
 	    virtual void drawpixels() = 0;
 	    virtual int loadzip(string filename) = 0;
-	    virtual vector<uint8_t> readfile(string filename) = 0;
-	    virtual vector<uint8_t> readfilefromzip(int id, string filename) = 0;
+	    virtual vector<uint8_t> readfile(string dirname, string subdir_name, string filename) = 0;
+	    virtual vector<uint8_t> readfilefromzip(int id, string dirname, string filename) = 0;
 	    virtual void closezip() = 0;
 	    virtual uint32_t getSampleRate() = 0;
 	    virtual void audioCallback(array<int16_t, 2> samples) = 0;
@@ -72,7 +72,10 @@ namespace berrn
 	BerrnRightP1,
 	BerrnUpP1,
 	BerrnDownP1,
-	BerrnFireP1,
+	BerrnButton1P1,
+	BerrnButton2P1,
+	BerrnService,
+	BerrnDump,
     };
 
     #define berrn_rom_erasemask    0x2000
@@ -80,6 +83,7 @@ namespace berrn
     #define berrn_rom_erasevalmask 0x00FF0000
     #define berrn_rom_eraseval(x)  ((((x) & 0xFF) << 16) | berrn_rom_erase)
     #define berrn_rom_eraseff      berrn_rom_eraseval(0xFF)
+    #define berrn_rom_erase00      berrn_rom_eraseval(0x00)
 
     #define berrn_is_erase      ((entry.flags & berrn_rom_erasemask) == berrn_rom_erase)
     #define berrn_get_erase_val ((entry.flags & berrn_rom_erasevalmask) >> 16)
@@ -115,6 +119,7 @@ namespace berrn
     #define berrn_rom_region(tag, length, flags) {tag, "", length, 0, flags, false},
     #define berrn_rom_load(filename, offs, length) {"", filename, offs, length, 0, false},
     #define berrn_rom_load16_byte(filename, offs, length) {"", filename, offs, length, berrn_rom_skip(1), false},
+    #define berrn_rom_load32_byte(filename, offs, length) {"", filename, offs, length, berrn_rom_skip(3), false},
     #define berrn_rom_load32_word(filename, offs, length) {"", filename, offs, length, berrn_rom_group_word | berrn_rom_skip(2), false},
     #define berrn_rom_end {"", "", 0, 0, 0, false}};
 
@@ -253,8 +258,8 @@ namespace berrn
 			    }
 			    else
 			    {
-				size_t skip_offs = (1 + skip_bytes);
 				size_t group_offs = (1 + group_bytes);
+				size_t skip_offs = (skip_bytes + group_offs);
 				size_t base_offs = entry.offset;
 
 				for (size_t i = 0; i < entry.length; i += group_offs, base_offs += skip_offs)
@@ -336,16 +341,8 @@ namespace berrn
 
 	    vector<uint8_t> load_file(string dir_name, string subdir_name, string rom_name)
 	    {
-		string subdir_path = get_path(dir_name, subdir_name);
-		string filename = get_path(subdir_path, rom_name);
-
-		vector<uint8_t> data = load_file_internal(filename);
-
-		if (data.empty())
-		{
-		    filename = get_path(dir_name, rom_name);
-		    data = load_file_internal(filename);
-		}
+		string dir_path = get_path(dir_name);
+		vector<uint8_t> data = load_file_internal(dir_name, subdir_name, rom_name);
 
 		return data;
 	    }
@@ -365,25 +362,18 @@ namespace berrn
 		    is_zip_loaded = true;
 		}
 
-		string filename = get_zip_path(subdir_name, rom_name);
-		data = read_file_zip_internal(zip_id, filename);
-
-		if (data.empty())
-		{
-		    filename = get_zip_path(rom_name);
-		    data = read_file_zip_internal(zip_id, filename);
-		}
+		data = read_file_zip_internal(zip_id, subdir_name, rom_name);
 
 		return data;
 	    }
 
-	    vector<uint8_t> load_file_internal(string filename)
+	    vector<uint8_t> load_file_internal(string dirname, string subdirname, string filename)
 	    {
 		vector<uint8_t> data;
 
 		if (front != NULL)
 		{
-		    data = front->readfile(filename);
+		    data = front->readfile(dirname, subdirname, filename);
 		}
 
 		return data;
@@ -399,13 +389,13 @@ namespace berrn
 		return -1;
 	    }
 
-	    vector<uint8_t> read_file_zip_internal(int id, string filename)
+	    vector<uint8_t> read_file_zip_internal(int id, string dirname, string filename)
 	    {
 		vector<uint8_t> data;
 
 		if (front != NULL)
 		{
-		    data = front->readfilefromzip(id, filename);
+		    data = front->readfilefromzip(id, dirname, filename);
 		}
 
 		return data;
@@ -434,20 +424,20 @@ namespace berrn
 
 	    }
 
-	    void add_mono(int32_t sample, double gain = 1.0)
+	    void add_mono(int32_t sample, double gain)
 	    {
 		int32_t adjusted_sample = int32_t(double(sample) * gain);
 		mixed_samples[0] += adjusted_sample;
 		mixed_samples[1] += adjusted_sample;
 	    }
 
-	    void add_stereo(int32_t left, int32_t right, double gain = 1.0)
+	    void add_stereo(int32_t left, int32_t right, double gain)
 	    {
 		array<int32_t, 2> samples = {left, right};
 		add_stereo(samples, gain);
 	    }
 
-	    void add_stereo(array<int32_t, 2> samples, double gain = 1.0)
+	    void add_stereo(array<int32_t, 2> samples, double gain)
 	    {
 		for (int i = 0; i < 2; i++)
 		{
@@ -538,6 +528,7 @@ namespace berrn
 
 	    void set_screen(BerrnBitmap *bitmap)
 	    {
+		delete screen;
 		if (bitmap->format() == BerrnRGB)
 		{
 		    BerrnBitmapRGB *bmp = reinterpret_cast<BerrnBitmapRGB*>(bitmap);
@@ -560,14 +551,14 @@ namespace berrn
 		return front->getSampleRate();
 	    }
 
-	    void add_mono_sample(int32_t sample)
+	    void add_mono_sample(int32_t sample, double gain = 1.0)
 	    {
-		mixer->add_mono(sample);
+		mixer->add_mono(sample, gain);
 	    }
 
-	    void add_stereo_sample(int32_t left, int32_t right)
+	    void add_stereo_sample(int32_t left, int32_t right, double gain = 1.0)
 	    {
-		mixer->add_stereo(left, right);
+		mixer->add_stereo(left, right, gain);
 	    }
 
 	    void output_audio()
@@ -729,6 +720,7 @@ namespace berrn
 		return samples;
 	    }
 
+	protected:
 	    virtual void init_device()
 	    {
 		return;

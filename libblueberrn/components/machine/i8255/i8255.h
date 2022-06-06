@@ -54,6 +54,11 @@ namespace i8255
 		cout << "I8255::Shutting down..." << endl;
 	    }
 
+	    void set_out_porta_callback(i8255write cb)
+	    {
+		port_a_write = cb;
+	    }
+
 	    void set_out_portb_callback(i8255write cb)
 	    {
 		port_b_write = cb;
@@ -63,6 +68,7 @@ namespace i8255
 	    {
 		switch ((addr & 0x3))
 		{
+		    case 0: write_port_a(data); break;
 		    case 1: write_port_b(data); break;
 		    case 3:
 		    {
@@ -108,12 +114,54 @@ namespace i8255
 		cout << "I8255 Port C lower mode: " << (testbit(control_reg, 0) ? "Input" : "Output") << endl;
 		cout << endl;
 
+		group_a_mode = ((control_reg >> 5) & 0x3);
+		is_port_a_input = testbit(control_reg, 4);
 		group_b_mode = testbit(control_reg, 2) ? 1 : 0;
 		is_port_b_input = testbit(control_reg, 1);
 
 		outputs[0] = 0;
 		outputs[1] = 0;
 		outputs[2] = 0;
+	    }
+
+	    void write_port_a(uint8_t data)
+	    {
+		switch (group_a_mode)
+		{
+		    case 0:
+		    {
+			if (!is_port_a_input)
+			{
+			    outputs[0] = data;
+
+			    // TODO: Implement remaining I8255 callback functions
+			    if (port_a_write)
+			    {
+				port_a_write(outputs[0]);
+			    }
+			}
+		    }
+		    break;
+		    case 2:
+		    case 3:
+		    {
+			outputs[0] = data;
+
+			if (port_a_write)
+			{
+			    port_a_write(outputs[0]);
+			}
+
+			cout << "Setting output buffer full flag and clearing IRQ..." << endl;
+		    }
+		    break;
+		    default:
+		    {
+			cout << "Unrecognized group A mode of " << dec << int(group_a_mode) << endl;
+			exit(0);
+		    }
+		    break;
+		}
 	    }
 
 	    void write_port_b(uint8_t data)
@@ -127,7 +175,6 @@ namespace i8255
 			    outputs[1] = data;
 
 			    // TODO: Implement remaining I8255 callback functions
-			    cout << "Writing value of " << hex << int(data) << " to I8255 port B" << endl;
 			    if (port_b_write)
 			    {
 				port_b_write(outputs[1]);
@@ -145,11 +192,14 @@ namespace i8255
 	    }
 
 	    uint8_t control_reg = 0;
+	    int group_a_mode = 0;
 	    int group_b_mode = 0;
+	    bool is_port_a_input = false;
 	    bool is_port_b_input = false;
 
 	    array<uint8_t, 3> outputs;
 
+	    i8255write port_a_write;
 	    i8255write port_b_write;
     };
 };

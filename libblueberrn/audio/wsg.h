@@ -36,48 +36,50 @@ namespace berrn
 
 	    void init(string tag = "namco")
 	    {
-		waveROM = driver.get_rom_region(tag);
-		audio_core.init(waveROM);
-		audio_core.set_num_voices(3);
+		cout << "Fetching wave ROM with tag of " << tag << endl;
 	    }
 
 	    void shutdown()
 	    {
-		audio_core.shutdown();
+		return;
 	    }
 
 	    void write_reg(int addr, uint8_t data)
 	    {
-		audio_core.write_wsg3(addr, data);
+		cout << "Writing value of " << hex << int(data) << " to Namco WSG3 address of " << hex << int(addr) << endl;
 	    }
 
 	    void set_sound_enabled(bool is_enabled)
 	    {
-		audio_core.set_sound_enabled(is_enabled);
+		if (is_enabled)
+		{
+		    cout << "Sound enabled" << endl;
+		}
+		else
+		{
+		    cout << "Sound disabled" << endl;
+		}
 	    }
 
 	    uint32_t get_clock_rate(uint32_t clk_rate)
 	    {
-		return audio_core.get_sample_rate(clk_rate);
+		return clk_rate;
 	    }
 
 	    void clock_chip()
 	    {
-		audio_core.clockchip();
+		return;
 	    }
 
 	    vector<int32_t> get_samples()
 	    {
 		vector<int32_t> samples;
-		samples.push_back(audio_core.get_sample());
+		samples.push_back(0);
 		return samples;
 	    }
 
 	private:
-	    wsgaudio audio_core;
-
 	    berrndriver &driver;
-	    vector<uint8_t> waveROM;
     };
 };
 

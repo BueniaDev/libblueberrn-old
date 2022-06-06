@@ -31,6 +31,11 @@ namespace berrn
 	    berrn_rom_load16_byte("b04-39.8",   0x20001, 0x10000)
 	    berrn_rom_load16_byte("b04-42.21",  0x40000, 0x10000)
 	    berrn_rom_load16_byte("b04-43-1.9", 0x40001, 0x10000)
+	berrn_rom_region("pc080sn", 0x080000, 0)
+	    berrn_rom_load16_byte("b04-01.40",  0x00000, 0x20000)
+	    berrn_rom_load16_byte("b04-02.67",  0x00001, 0x20000)
+	    berrn_rom_load16_byte("b04-03.39",  0x40000, 0x20000)
+	    berrn_rom_load16_byte("b04-04.66",  0x40001, 0x20000)
     berrn_rom_end
 
     RastanM68K::RastanM68K(berrndriver &drv, RastanCore &core) : driver(drv), main_core(core)
@@ -94,6 +99,22 @@ namespace berrn
 	    */
 	    data = 0x0000;
 	}
+	else if (addr == 0x390004)
+	{
+	    // SPECIAL
+	    if (lower)
+	    {
+		data = 0x8F;
+	    }
+	}
+	else if (addr == 0x390006)
+	{
+	    // SYSTEM
+	    if (lower)
+	    {
+		data = 0x1F;
+	    }
+	}
 	else if (addr == 0x390008)
 	{
 	    // DSWA
@@ -114,6 +135,17 @@ namespace berrn
 	{
 	    /*
 	    cout << "Taito PC080SN word read" << endl;
+	    cout << "Upper: " << dec << int(upper) << endl;
+	    cout << "Lower: " << dec << int(lower) << endl;
+	    cout << "Address: " << hex << int(addr) << endl;
+	    cout << endl;
+	    */
+	    data = main_core.readPC080SN(0, upper, lower, addr);
+	}
+	else if (inRange(addr, 0xD00000, 0xD04000))
+	{
+	    /*
+	    cout << "Taito PC090OJ word read" << endl;
 	    cout << "Upper: " << dec << int(upper) << endl;
 	    cout << "Lower: " << dec << int(lower) << endl;
 	    cout << "Address: " << hex << int(addr) << endl;
@@ -211,6 +243,7 @@ namespace berrn
 	    cout << "Data: " << hex << int(data) << endl;
 	    cout << endl;
 	    */
+	    main_core.writePC080SN(0, upper, lower, addr, data);
 	}
 	else if (inRange(addr, 0xC20000, 0xC20004))
 	{
@@ -222,6 +255,7 @@ namespace berrn
 	    cout << "Data: " << hex << int(data) << endl;
 	    cout << endl;
 	    */
+	    main_core.writePC080SN(1, upper, lower, addr, data);
 	}
 	else if (inRange(addr, 0xC40000, 0xC40004))
 	{
@@ -233,6 +267,7 @@ namespace berrn
 	    cout << "Data: " << hex << int(data) << endl;
 	    cout << endl;
 	    */
+	    main_core.writePC080SN(2, upper, lower, addr, data);
 	}
 	else if (inRange(addr, 0xC50000, 0xC50004))
 	{
@@ -244,6 +279,7 @@ namespace berrn
 	    cout << "Data: " << hex << int(data) << endl;
 	    cout << endl;
 	    */
+	    main_core.writePC080SN(3, upper, lower, addr, data);
 	}
 	else if (inRange(addr, 0xD00000, 0xD04000))
 	{
@@ -266,16 +302,17 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 
-	scheduler.set_quantum(time_in_hz(600));
-
 	main_inter = new RastanM68K(driver, *this);
 
 	main_proc = new BerrnM68KProcessor(8000000, *main_inter);
 	main_cpu = new BerrnCPU(scheduler, *main_proc);
 
+	tile_video = new rastanvideo(driver);
+
 	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
 	{
 	    main_proc->fire_interrupt_level(5);
+	    tile_video->updatePixels();
 	});
     }
 
@@ -287,10 +324,13 @@ namespace berrn
     bool RastanCore::init_core()
     {
 	auto &scheduler = driver.get_scheduler();
+	scheduler.set_quantum(time_in_hz(600));
 	main_inter->init();
 	main_proc->init();
+	tile_video->init();
 	scheduler.add_device(main_cpu);
 	vblank_timer->start(time_in_hz(60), true);
+	// driver.resize(512, 512, 1);
 	driver.resize(320, 240, 2);
 
 	return true;
@@ -299,6 +339,7 @@ namespace berrn
     void RastanCore::stop_core()
     {
 	vblank_timer->stop();
+	tile_video->shutdown();
 	main_inter->shutdown();
 	main_proc->shutdown();
     }
@@ -306,6 +347,16 @@ namespace berrn
     void RastanCore::run_core()
     {
 	driver.run_scheduler();
+    }
+
+    uint16_t RastanCore::readPC080SN(int bank, bool upper, bool lower, uint32_t addr)
+    {
+	return tile_video->readPC080SN(bank, upper, lower, addr);
+    }
+
+    void RastanCore::writePC080SN(int bank, bool upper, bool lower, uint32_t addr, uint16_t data)
+    {
+	tile_video->writePC080SN(bank, upper, lower, addr, data);
     }
 
     driverrastan::driverrastan()
@@ -345,8 +396,46 @@ namespace berrn
 
     void driverrastan::keychanged(BerrnInput key, bool is_pressed)
     {
-	(void)key;
-	(void)is_pressed;
-	return;
+	string key_state = (is_pressed) ? "pressed" : "released";
+
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		cout << "Coin button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		cout << "P1 start button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		cout << "P1 left button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		cout << "P1 right button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnUpP1:
+	    {
+		cout << "P1 up button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnDownP1:
+	    {
+		cout << "P1 down button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnButton1P1:
+	    {
+		cout << "P1 button 1 has been " << key_state << endl;
+	    }
+	    break;
+	    default: break;
+	}
     }
 };

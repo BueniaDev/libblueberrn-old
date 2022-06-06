@@ -3,6 +3,14 @@ set(VIDEO_SOURCES
 	libblueberrn/video/pacman.cpp
 	libblueberrn/video/galaga.cpp
 	libblueberrn/video/1942.cpp
+	libblueberrn/video/1943.cpp
+	libblueberrn/video/k052109.cpp
+	libblueberrn/video/k051960.cpp
+	libblueberrn/video/konmedal.cpp
+	libblueberrn/video/tmnt.cpp
+	libblueberrn/video/bombjack.cpp
+	libblueberrn/video/pc080sn.cpp
+	libblueberrn/video/rastan.cpp
 	PARENT_SCOPE)
 
 set(VIDEO_HEADERS
@@ -10,4 +18,12 @@ set(VIDEO_HEADERS
 	libblueberrn/video/pacman.h
 	libblueberrn/video/galaga.h
 	libblueberrn/video/1942.h
+	libblueberrn/video/1943.h
+	libblueberrn/video/k052109.h
+	libblueberrn/video/k051960.h
+	libblueberrn/video/konmedal.h
+	libblueberrn/video/tmnt.h
+	libblueberrn/video/bombjack.h
+	libblueberrn/video/pc080sn.h
+	libblueberrn/video/rastan.h
 	PARENT_SCOPE)

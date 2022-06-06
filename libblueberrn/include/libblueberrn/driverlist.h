@@ -36,14 +36,19 @@ namespace berrn
 	    DRIVER(galaxian);
 	    DRIVER(pacman);
 	    DRIVER(galaga);
+	    DRIVER(bosco);
 	    DRIVER(wboy2u);
-	    DRIVER(rastan);
+	    DRIVER(rastan); // WIP (relies on M68K emulation)
 	    DRIVER(centiped);
 	    DRIVER(1942);
-	    DRIVER(1943u);
-	    DRIVER(tmnt);
-	    DRIVER(xmen);
-	    DRIVER(ddonpach);
+	    DRIVER(1943u); // WIP
+	    DRIVER(tmnt); // WIP (relies on M68K and K051960 emulation)
+	    DRIVER(xmen); // WIP (relies on M68K emulation)
+	    DRIVER(ddonpach); // WIP (relies on M68K emulation)
+	    DRIVER(shuriboy);
+	    DRIVER(mariorou);
+	    DRIVER(aliens); // WIP (relies on KONAMI-2 emulation)
+	    DRIVER(bombjack); // WIP
 	}
     };
 };

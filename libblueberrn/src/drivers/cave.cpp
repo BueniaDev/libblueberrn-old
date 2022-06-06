@@ -19,8 +19,19 @@
 #include "cave.h"
 using namespace berrn;
 
+// Driver Name:
+// Cave 68K Hardware - Cave (WIP)
+//
+// Blueberry's Notes:
+//
+// This driver is a huge WIP, and a lot of features (including the video system)
+// are completely unimplemented.
+// However, work is being done to improve this driver, so don't lose hope here!
+
 namespace berrn
 {
+    // TODO: Load in other ROMs in this set as well
+    // (currently only the M68K ROMs are included)
     berrn_rom_start(ddonpach)
 	berrn_rom_region("maincpu", 0x100000, 0)
 	    berrn_rom_load16_byte("b1.u27", 0x000000, 0x080000)
@@ -146,6 +157,19 @@ namespace berrn
 		data |= 0xFF;
 	    }
 	}
+	else if (addr == 0xD00002)
+	{
+	    // TODO: IN1 reads
+	    if (upper)
+	    {
+		data |= 0xF700;
+	    }
+
+	    if (lower)
+	    {
+		data |= 0xFF;
+	    }
+	}
 	else
 	{
 	    data = BerrnInterface::readCPU16(upper, lower, addr);
@@ -224,6 +248,42 @@ namespace berrn
 	{
 	    /*
 	    cout << "Video register write" << endl;
+	    cout << "Upper: " << dec << int(upper) << endl;
+	    cout << "Lower: " << dec << int(lower) << endl;
+	    cout << "Address: " << hex << int(addr) << endl;
+	    cout << "Data: " << hex << int(data) << endl;
+	    cout << endl;
+	    */
+	    return;
+	}
+	else if (inRange(addr, 0x900000, 0x900006))
+	{
+	    /*
+	    cout << "Tilemap 038 layer 0 register write" << endl;
+	    cout << "Upper: " << dec << int(upper) << endl;
+	    cout << "Lower: " << dec << int(lower) << endl;
+	    cout << "Address: " << hex << int(addr) << endl;
+	    cout << "Data: " << hex << int(data) << endl;
+	    cout << endl;
+	    */
+	    return;
+	}
+	else if (inRange(addr, 0xA00000, 0xA00006))
+	{
+	    /*
+	    cout << "Tilemap 038 layer 1 register write" << endl;
+	    cout << "Upper: " << dec << int(upper) << endl;
+	    cout << "Lower: " << dec << int(lower) << endl;
+	    cout << "Address: " << hex << int(addr) << endl;
+	    cout << "Data: " << hex << int(data) << endl;
+	    cout << endl;
+	    */
+	    return;
+	}
+	else if (inRange(addr, 0xB00000, 0xB00006))
+	{
+	    /*
+	    cout << "Tilemap 038 layer 2 register write" << endl;
 	    cout << "Upper: " << dec << int(upper) << endl;
 	    cout << "Lower: " << dec << int(lower) << endl;
 	    cout << "Address: " << hex << int(addr) << endl;
@@ -429,9 +489,9 @@ namespace berrn
 		cout << "P1 down button has been " << key_state << endl;
 	    }
 	    break;
-	    case BerrnInput::BerrnFireP1:
+	    case BerrnInput::BerrnButton1P1:
 	    {
-		cout << "P1 fire button has been " << key_state << endl;
+		cout << "P1 button 1 has been " << key_state << endl;
 	    }
 	    break;
 	    default: break;

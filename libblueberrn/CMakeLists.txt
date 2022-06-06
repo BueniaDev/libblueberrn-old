@@ -11,6 +11,7 @@ set(LIBBLUEBERRN
 	libblueberrn/src/drivers/galaxian.cpp
 	libblueberrn/src/drivers/pacman.cpp
 	libblueberrn/src/drivers/galaga.cpp
+	libblueberrn/src/drivers/bosco.cpp
 	libblueberrn/src/drivers/system1.cpp
 	libblueberrn/src/drivers/rastan.cpp
 	libblueberrn/src/drivers/centipede.cpp
@@ -19,6 +20,9 @@ set(LIBBLUEBERRN
 	libblueberrn/src/drivers/tmnt.cpp
 	libblueberrn/src/drivers/xmen.cpp
 	libblueberrn/src/drivers/cave.cpp
+	libblueberrn/src/drivers/konmedal.cpp
+	libblueberrn/src/drivers/aliens.cpp
+	libblueberrn/src/drivers/bombjack.cpp
 	${MACHINE_SOURCES}
 	${VIDEO_SOURCES}
 	${AUDIO_SOURCES}
@@ -39,6 +43,7 @@ set(LIBBLUEBERRN_HEADERS
 	libblueberrn/include/drivers/galaxian.h
 	libblueberrn/include/drivers/pacman.h
 	libblueberrn/include/drivers/galaga.h
+	libblueberrn/include/drivers/bosco.h
 	libblueberrn/include/drivers/system1.h
 	libblueberrn/include/drivers/rastan.h
 	libblueberrn/include/drivers/centipede.h
@@ -47,6 +52,9 @@ set(LIBBLUEBERRN_HEADERS
 	libblueberrn/include/drivers/tmnt.h
 	libblueberrn/include/drivers/xmen.h
 	libblueberrn/include/drivers/cave.h
+	libblueberrn/include/drivers/konmedal.h
+	libblueberrn/include/drivers/aliens.h
+	libblueberrn/include/drivers/bombjack.h
 	${MACHINE_HEADERS}
 	${VIDEO_HEADERS}
 	${AUDIO_HEADERS}

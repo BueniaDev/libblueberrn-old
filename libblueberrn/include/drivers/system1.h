@@ -41,6 +41,7 @@ namespace berrn
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
+	    uint8_t portIn(uint16_t port);
 	    void portOut(uint16_t port, uint8_t data);
 
 	private:
@@ -49,6 +50,13 @@ namespace berrn
 
 	    vector<uint8_t> main_rom;
 	    array<uint8_t, 0x1000> main_ram;
+
+	    // TODO: Implement video system
+	    array<uint8_t, 0x1000> video_ram;
+
+	    array<uint8_t, 0x800> sprite_ram;
+
+	    array<uint8_t, 0x800> palette_ram;
     };
 
     class LIBBLUEBERRN_API SegaSystem1
@@ -61,7 +69,10 @@ namespace berrn
 	    virtual void stop_core();
 	    void run_core();
 
+	    virtual uint8_t portIn(uint16_t addr);
 	    virtual void portOut(uint16_t addr, uint8_t data);
+
+	    virtual uint8_t readDIP(int bank);
 
 	private:
 	    berrndriver &driver;
@@ -69,6 +80,8 @@ namespace berrn
 
 	    BerrnZ80Processor *main_proc = NULL;
 	    BerrnCPU *main_cpu = NULL;
+
+	    BerrnTimer *vblank_timer = NULL;
     };
 
     class LIBBLUEBERRN_API SegaSys1PPI : public SegaSystem1
@@ -80,10 +93,20 @@ namespace berrn
 	    bool init_core();
 	    void stop_core();
 
+	    uint8_t portIn(uint16_t addr);
 	    void portOut(uint16_t addr, uint8_t data);
 
 	private:
 	    i8255ppi main_ppi;
+    };
+
+    class LIBBLUEBERRN_API WonderBoyCore : public SegaSys1PPI
+    {
+	public:
+	    WonderBoyCore(berrndriver &drv);
+	    ~WonderBoyCore();
+
+	    uint8_t readDIP(int bank);
     };
 
     class LIBBLUEBERRN_API driverwboy2u : public berrndriver
@@ -102,7 +125,7 @@ namespace berrn
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    SegaSys1PPI *core = NULL;
+	    WonderBoyCore *core = NULL;
     };
 };
 

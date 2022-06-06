@@ -128,7 +128,6 @@ class BerrnM68KProcessor : public BerrnProcessor
 		}
 		else
 		{
-		    // core.debugoutput();
 		    cycles_left -= core.executenextinstr();
 		}
 	    }
@@ -147,6 +146,12 @@ class BerrnM68KProcessor : public BerrnProcessor
 	    is_halted = is_halting;
 	}
 
+	void debug_output()
+	{
+	    cout << "M68K output: " << endl;
+	    core.debugoutput();
+	}
+
     private:
 	uint64_t clock_freq = 0;
 	BerrnM68KInterface *procinter = NULL;
@@ -156,6 +161,8 @@ class BerrnM68KProcessor : public BerrnProcessor
 	int64_t cycles_left = 0;
 	bool is_stopped = true;
 	bool is_halted = false;
+	bool dump = false;
+	int num_instrs = 0;
 };
 
 #endif // LIBBLUEBERRN_M68K_H

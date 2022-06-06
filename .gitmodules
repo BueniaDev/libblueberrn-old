@@ -19,3 +19,12 @@
 [submodule "libblueberrn/components/audio/psg/BeePSG"]
 	path = libblueberrn/components/audio/psg/BeePSG
 	url = https://github.com/BueniaDev/BeePSG.git
+[submodule "libblueberrn/components/konami/konami/BeeKonami"]
+	path = libblueberrn/components/konami/konami/BeeKonami
+	url = https://github.com/BueniaDev/BeeKonami.git
+[submodule "libblueberrn/components/cpu/m680x/Botnami"]
+	path = libblueberrn/components/cpu/m680x/Botnami
+	url = https://github.com/BueniaDev/Botnami.git
+[submodule "libblueberrn/components/audio/fm/BeeNuked"]
+	path = libblueberrn/components/audio/fm/BeeNuked
+	url = https://github.com/BueniaDev/BeeNuked.git

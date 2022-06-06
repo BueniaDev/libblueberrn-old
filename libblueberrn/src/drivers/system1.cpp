@@ -21,6 +21,15 @@ using namespace berrn;
 using namespace std;
 using namespace std::placeholders;
 
+// Driver Name:
+// Sega System 1 Hardware - Sega (WIP)
+//
+// Blueberry's Notes:
+//
+// This driver is a huge WIP, and a lot of features (including the video system)
+// are completely unimplemented.
+// However, work is being done to improve this driver, so don't lose hope here!
+
 namespace berrn
 {
     // Blueberry's Notes:
@@ -35,7 +44,7 @@ namespace berrn
     // https://github.com/mamedev/mame/blob/master/src/mame/drivers/system1.cpp
     //
     // To account for this, support was added in the BeeZ80 engine
-    // (which is providing Zilog Z80 emulation for libblueberrn) for customizable
+    // (which provides Zilog Z80 emulation for libblueberrn) for customizable
     // pre-scalers for both original Z80 cycles and opcode fetch cycles.
 
     berrn_rom_start(wboy2u)
@@ -62,6 +71,8 @@ namespace berrn
     {
 	main_rom = driver.get_rom_region("maincpu");
 	main_ram.fill(0);
+	video_ram.fill(0);
+	sprite_ram.fill(0);
     }
 
     void Sys1MainInterface::shutdown()
@@ -73,13 +84,26 @@ namespace berrn
     {
 	uint8_t data = 0;
 
+	// TODO: Certain games on this platform utilize ROM banking starting at 0x8000
 	if (addr < 0xC000)
 	{
 	    data = main_rom.at(addr);
 	}
-	else if (addr < 0xD000)
+	else if (inRange(addr, 0xC000, 0xD000))
 	{
-	    data = main_ram.at((addr & 0xFFF));
+	    data = main_ram.at(addr & 0xFFF);
+	}
+	else if (inRange(addr, 0xD000, 0xD800))
+	{
+	    data = sprite_ram.at(addr & 0x7FF);
+	}
+	else if (inRange(addr, 0xD800, 0xE000))
+	{
+	    data = palette_ram.at(addr & 0x7FF);
+	}
+	else if (inRange(addr, 0xE000, 0xF000))
+	{
+	    data = video_ram.at(addr & 0xFFF);
 	}
 	else
 	{
@@ -95,9 +119,21 @@ namespace berrn
 	{
 	    return;
 	}
-	else if (addr < 0xD000)
+	else if (inRange(addr, 0xC000, 0xD000))
 	{
-	    main_ram.at((addr & 0xFFF)) = data;
+	    main_ram.at(addr & 0xFFF) = data;
+	}
+	else if (inRange(addr, 0xD000, 0xD800))
+	{
+	    sprite_ram.at(addr & 0x7FF) = data;
+	}
+	else if (inRange(addr, 0xD800, 0xE000))
+	{
+	    palette_ram.at(addr & 0x7FF) = data;
+	}
+	else if (inRange(addr, 0xE000, 0xF000))
+	{
+	    video_ram.at(addr & 0xFFF) = data;
 	}
 	else
 	{
@@ -105,15 +141,21 @@ namespace berrn
 	}
     }
 
+    uint8_t Sys1MainInterface::portIn(uint16_t port)
+    {
+	port &= 0x1F;
+	return main_core.portIn(port);
+    }
+
     void Sys1MainInterface::portOut(uint16_t port, uint8_t data)
     {
-	main_core.portOut((port & 0x1F), data);
+	port &= 0x1F;
+	main_core.portOut(port, data);
     }
 
     SegaSystem1::SegaSystem1(berrndriver &drv) : driver(drv)
     {
 	auto &scheduler = driver.get_scheduler();
-	scheduler.set_quantum(time_in_hz(6000));
 
 	main_inter = new Sys1MainInterface(driver, *this);
 
@@ -122,6 +164,11 @@ namespace berrn
 	main_proc = new BerrnZ80Processor(20000000, *main_inter);
 	main_proc->set_prescalers(5, 2); // See notes for details
 	main_cpu = new BerrnCPU(scheduler, *main_proc);
+
+	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
+	{
+	    main_proc->fire_interrupt8();
+	});
     }
 
     SegaSystem1::~SegaSystem1()
@@ -132,7 +179,9 @@ namespace berrn
     bool SegaSystem1::init_core()
     {
 	auto &scheduler = driver.get_scheduler();
+	scheduler.set_quantum(time_in_hz(6000));
 	scheduler.add_device(main_cpu);
+	vblank_timer->start(16640, true);
 	main_inter->init();
 	main_proc->init();
 	return true;
@@ -140,6 +189,7 @@ namespace berrn
 
     void SegaSystem1::stop_core()
     {
+	vblank_timer->stop();
 	main_inter->shutdown();
 	main_proc->shutdown();
     }
@@ -149,10 +199,33 @@ namespace berrn
 	driver.run_scheduler();
     }
 
+    uint8_t SegaSystem1::portIn(uint16_t addr)
+    {
+	cout << "Reading value from Sega System 1 port of " << hex << int(addr) << endl;
+	exit(0);
+	return 0;
+    }
+
     void SegaSystem1::portOut(uint16_t addr, uint8_t data)
     {
 	cout << "Writing value of " << hex << int(data) << " to Sega System 1 port of " << hex << int(addr) << endl;
 	exit(0);
+    }
+
+    uint8_t SegaSystem1::readDIP(int bank)
+    {
+	uint8_t data = 0;
+	switch (bank)
+	{
+	    case 0: data = 0xFF; break; // P1
+	    case 1: data = 0xFF; break; // P2
+	    case 2: data = 0xFF; break; // SYSTEM
+	    case 3: data = 0xFF; break; // SWA
+	    case 4: data = 0xFE; break; // SWB
+	    default: data = 0; break;
+	}
+
+	return data;
     }
 
     SegaSys1PPI::SegaSys1PPI(berrndriver &drv) : SegaSystem1(drv)
@@ -168,6 +241,11 @@ namespace berrn
     bool SegaSys1PPI::init_core()
     {
 	main_ppi.init();
+	main_ppi.set_out_porta_callback([&](uint8_t data) -> void
+	{
+	    cout << "Writing value of " << hex << int(data) << " to sound port register" << endl;
+	});
+
 	main_ppi.set_out_portb_callback([&](uint8_t data) -> void
 	{
 	    cout << "Writing value of " << hex << int(data) << " to video mode register" << endl;
@@ -182,21 +260,74 @@ namespace berrn
 	SegaSystem1::stop_core();
     }
 
+    uint8_t SegaSys1PPI::portIn(uint16_t addr)
+    {
+	uint8_t data = 0;
+
+	if (inRange(addr, 0x00, 0x04))
+	{
+	    data = readDIP(0);
+	}
+	else if (inRange(addr, 0x04, 0x08))
+	{
+	    data = readDIP(1);
+	}
+	else if (inRange(addr, 0x08, 0x0C))
+	{
+	    data = readDIP(2);
+	}
+	else if (inRange(addr, 0x0C, 0x10))
+	{
+	    int dip_bank = testbit(addr, 0) ? 4 : 3;
+	    data = readDIP(dip_bank);
+	}
+	else if (inRange(addr, 0x10, 0x14))
+	{
+	    data = readDIP(4);
+	}
+	else
+	{
+	    data = SegaSystem1::portIn(addr);
+	}
+
+	return data;
+    }
+
     void SegaSys1PPI::portOut(uint16_t addr, uint8_t data)
     {
-	switch (addr)
+	if (inRange(addr, 0x14, 0x18))
 	{
-	    case 0x14: main_ppi.write(0, data); break;
-	    case 0x15: main_ppi.write(1, data); break;
-	    case 0x16: main_ppi.write(2, data); break;
-	    case 0x17: main_ppi.write(3, data); break;
-	    default: break;
+	    main_ppi.write((addr - 0x14), data);
 	}
+    }
+
+    WonderBoyCore::WonderBoyCore(berrndriver &drv) : SegaSys1PPI(drv)
+    {
+
+    }
+
+    WonderBoyCore::~WonderBoyCore()
+    {
+
+    }
+
+    uint8_t WonderBoyCore::readDIP(int bank)
+    {
+	uint8_t data = 0;
+	switch (bank)
+	{
+	    case 0: data = 0xFF; break; // P1
+	    case 1: data = 0xFF; break; // P2
+	    case 4: data = 0xEC; break; // SWB
+	    default: data = SegaSys1PPI::readDIP(bank); break;
+	}
+
+	return data;
     }
 
     driverwboy2u::driverwboy2u()
     {
-	core = new SegaSys1PPI(*this);
+	core = new WonderBoyCore(*this);
     }
 
     driverwboy2u::~driverwboy2u()
@@ -270,9 +401,9 @@ namespace berrn
 		cout << "P1 down button has been " << key_state << endl;
 	    }
 	    break;
-	    case BerrnInput::BerrnFireP1:
+	    case BerrnInput::BerrnButton1P1:
 	    {
-		cout << "P1 fire button has been " << key_state << endl;
+		cout << "P1 button 1 has been " << key_state << endl;
 	    }
 	    break;
 	    default: break;

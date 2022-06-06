@@ -28,7 +28,7 @@ using namespace std;
 
 namespace berrn
 {
-    class LIBBLUEBERRN_API berrn1942video
+    class berrn1942video
     {
 	public:
 	    berrn1942video(berrndriver &drv);
@@ -39,6 +39,9 @@ namespace berrn
 
 	    void updatePixels();
 
+	    void writeScroll(bool is_msb, uint8_t data);
+	    void writePaletteBank(uint8_t data);
+
 	    uint8_t readBG(uint16_t addr);
 	    void writeBG(uint16_t addr, uint8_t data);
 
@@ -48,45 +51,41 @@ namespace berrn
 	    uint8_t readOBJ(uint16_t addr);
 	    void writeOBJ(uint16_t addr, uint8_t data);
 
-	    void setScroll(bool is_msb, uint8_t data);
-	    void setPaletteBank(uint8_t data);
-
 	private:
 	    berrndriver &driver;
 
-	    array<uint8_t, 0x80> obj_ram;
-	    array<uint8_t, 0x800> fg_ram;
-	    array<uint8_t, 0x400> bg_ram;
+	    array<uint8_t, 0x400> bg_vram;
+	    array<uint8_t, 0x800> fg_vram;
+	    array<uint8_t, 0x80> obj_vram;
 
-	    BerrnBitmapRGB *bitmap = NULL;
+	    array<array<uint8_t, 0x100>, 4> bg_palettes;
+	    array<uint8_t, 0x100> fg_palettes;
+	    array<uint8_t, 0x100> obj_palettes;
 
-	    void init_palette();
+	    array<berrnRGBA, 256> colors;
+
+	    vector<uint8_t> bg_tiles;
+	    vector<uint8_t> fg_tiles;
+	    vector<uint8_t> obj_tiles;
 
 	    void updateBackground();
-	    void updateSprites();
-	    void updateForeground();
+	    void drawBGTile(uint32_t tile_num, int pal_num, int xcoord, int ycoord, bool flipx, bool flipy);
 
-	    void drawBGTile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord, bool flipx, bool flipy);
-	    void drawFGTile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord);
-	    void drawSprite(uint32_t sprite_num, uint32_t pal_num, int xcoord, int ycoord);
+	    void updateForeground();
+	    void drawFGTile(uint32_t tile_num, int pal_num, int xcoord, int ycoord);
+
+	    void updateSprites();
+	    void drawSprite(uint32_t sprite_num, int pal_num, int xcoord, int ycoord);
+
+	    void initPalettes();
 
 	    uint16_t scroll_x = 0;
 	    int palette_bank = 0;
 
-	    vector<uint8_t> bg_tiles;
-
-	    vector<uint8_t> fg_tiles;
-
-	    vector<uint8_t> obj_tiles;
-
-	    array<array<uint8_t, 256>, 4> bg_pal;
-	    array<uint8_t, 256> fg_pal;
-	    array<uint8_t, 256> obj_pal;
-
-	    array<berrnRGBA, 256> colors;
-
 	    int clip_min = 0;
 	    int clip_max = 0;
+
+	    BerrnBitmapRGB *bitmap = NULL;
     };
 };
 

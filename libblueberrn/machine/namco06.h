@@ -20,68 +20,58 @@
 #define BERRN_NAMCO06_H
 
 #include <libblueberrn_api.h>
-#include <utils.h>
-#include <scheduler.h>
+#include <driver.h>
 using namespace berrn;
 using namespace std;
 
 namespace berrn
 {
-    using namco06read = function<uint8_t(int)>;
-    using namco06write = function<void(int, uint8_t)>;
-    using namco06rw = function<void(int, bool)>;
-    using namco06sel = function<void(int, bool)>;
+    using csfunc = function<void(int, bool)>;
 
     class namco06xx
     {
 	public:
-	    namco06xx(BerrnCPU &cpu, uint64_t clk_freq);
+	    namco06xx(berrndriver &drv, uint64_t clk_freq);
 	    ~namco06xx();
 
-	    uint8_t read_control();
-	    uint8_t read_data();
+	    void set_maincpu(BerrnCPU *cpu);
 
-	    void write_control(uint8_t data);
-	    void write_data(uint8_t data);
+	    uint8_t readControl();
+	    void writeControl(uint8_t data);
 
-	    void set_read_callback(namco06read func)
+	    void writeData(uint8_t data);
+
+	    void set_chip_select(csfunc cb)
 	    {
-		read_func = func;
-	    }
-
-	    void set_write_callback(namco06write func)
-	    {
-		write_func = func;
-	    }
-
-	    void set_chipsel_callback(namco06sel func)
-	    {
-		chipsel_func = func;
-	    }
-
-	    void set_rw_callback(namco06rw func)
-	    {
-		rw_func = func;
+		chip_select_func = cb;
 	    }
 
 	private:
-	    BerrnTimer *timer = NULL;
-	    BerrnCPU &main_cpu;
+	    berrndriver &driver;
+	    uint64_t clock_freq = 0;
+
+	    csfunc chip_select_func;
+
+	    BerrnCPU *nmi_cpu = NULL;
+
+	    BerrnTimer *ctrl_sync = NULL;
+	    BerrnTimer *data_sync = NULL;
+	    BerrnTimer *nmi_timer = NULL;
+
+	    void writeControlSync(uint8_t data);
+	    void writeDataSync(uint8_t data);
 
 	    uint8_t control_reg = 0;
 
-	    uint64_t clock_freq;
+	    void set_nmi(bool line);
 
-	    namco06read read_func;
-	    namco06write write_func;
+	    void rw(int addr, bool line);
+	    void chip_select(int addr, bool line);
 
-	    namco06rw rw_func;
-	    namco06sel chipsel_func;
+	    void write(int addr, uint8_t data);
 
-	    bool rw_stretch = false;
-	    bool rw_change = false;
 	    bool next_timer_state = false;
-	    bool nmi_stretch = false;
+	    bool read_stretch = false;
     };
 };
 

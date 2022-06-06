@@ -63,6 +63,9 @@ namespace berrn
 
 	    void writeIRQ(bool line);
 
+	    uint16_t readPalette(bool upper, bool lower, uint32_t addr);
+	    void writePalette(bool upper, bool lower, uint32_t addr, uint16_t data);
+
 	private:
 	    berrndriver &driver;
 
@@ -76,6 +79,8 @@ namespace berrn
 	    int current_scanline = 0;
 
 	    bool is_vblank_irq = false;
+
+	    BerrnPaletteXBGR555 *palette = NULL;
     };
 
     class LIBBLUEBERRN_API driverxmen : public berrndriver

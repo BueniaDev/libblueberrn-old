@@ -63,6 +63,81 @@ namespace berrn
 	gfxDecodeSet(char_layout, tile_rom, tile_ram);
 	video_ram.fill(0);
 	obj_ram.fill(0);
+	init_starfield();
+    }
+
+    void galaxianvideo::init_starfield()
+    {
+	// Initial setup derived from MAME
+
+	int stars = 0;
+	uint32_t generator = 0;
+
+	for (int ypos = 0; ypos < 512; ypos++)
+	{
+	    for (int xpos = 0; xpos < 256; xpos++)
+	    {
+		bool gen_bit = (!testbit(generator, 16) != testbit(generator, 4));
+		generator = ((generator << 1) | gen_bit);
+
+		if (!testbit(generator, 16) && ((generator & 0xFF) == 0xFF))
+		{
+		    int color = ((~(generator >> 8)) & 0x3F);
+
+		    if (color != 0)
+		    {
+			if (stars < 2520)
+			{
+			    starfield[stars].xpos = xpos;
+			    starfield[stars].ypos = ypos;
+			    starfield[stars].color = color;
+			    stars += 1;
+			}
+		    }
+		}
+	    }
+	}
+    }
+
+    void galaxianvideo::update_star_scroll()
+    {
+	if (is_starfield_enabled)
+	{
+	    starfield_scroll_pos += 1;
+	}
+	else
+	{
+	    starfield_scroll_pos = 0;
+	}
+    }
+
+    void galaxianvideo::draw_star_pixel(int xpos, int ypos, int color)
+    {
+	color &= 0x3F;
+
+	array<uint8_t, 4> starmap = {0, 194, 214, 255};
+
+	int red = starmap.at((color & 0x3));
+	int green = starmap.at(((color >> 2) & 0x3));
+	int blue = starmap.at(((color >> 4) & 0x3));
+
+	bitmap->setPixel(xpos, ypos, fromRGB(red, green, blue));
+    }
+
+    void galaxianvideo::draw_starfield()
+    {
+	for (int i = 0; i < 2520; i++)
+	{
+	    int ypos = (starfield[i].ypos + starfield_scroll_pos);
+	    int xpos = ((starfield[i].xpos + (ypos >> 9)) & 0xFF);
+
+	    ypos = ((ypos & 0x1FF) / 2);
+
+	    if (testbit(xpos, 0) != testbit(ypos, 3))
+	    {
+		draw_star_pixel(ypos, (xpos - 16), starfield[i].color);
+	    }
+	}
     }
 
     void galaxianvideo::shutdown()
@@ -75,7 +150,13 @@ namespace berrn
 
     void galaxianvideo::updatePixels()
     {
+	update_star_scroll();
 	bitmap->fillcolor(black());
+
+	if (is_starfield_enabled)
+	{
+	    draw_starfield();
+	}
 
 	for (int col = 0; col < 32; col++)
 	{
@@ -88,10 +169,78 @@ namespace berrn
 
 		int cx = (row * 8);
 		int cy = ((col * 8) - 16);
-		if (inRange(cy, -7, 224))
+		
+		uint8_t tile_num = video_ram.at(offs);
+		draw_tile(tile_num, cx, cy, color, scroll);
+	    }
+	}
+
+	for (int y = 0; y < 224; y++)
+	{
+	    uint8_t shell = 0xFF;
+	    uint8_t missile = 0xFF;
+	    uint8_t y_eff = 0;
+
+	    y_eff = (y + 15);
+
+	    for (int i = 0; i < 3; i++)
+	    {
+		uint32_t bullet_offs = (0x60 + (i * 4));
+		uint8_t pos = uint8_t(obj_ram.at(bullet_offs + 1) + y_eff);
+
+		if (pos == 0xFF)
 		{
-		    uint8_t tile_num = video_ram.at(offs);
-		    draw_tile(tile_num, cx, cy, color, scroll);
+		    shell = i;
+		}
+	    }
+
+	    y_eff = (y + 16);
+
+	    for (int i = 3; i < 8; i++)
+	    {
+		uint32_t bullet_offs = (0x60 + (i * 4));
+		uint8_t pos = uint8_t(obj_ram.at(bullet_offs + 1) + y_eff);
+
+		if (pos == 0xFF)
+		{
+		    if (i != 7)
+		    {
+			shell = i;
+		    }
+		    else
+		    {
+			missile = i;
+		    }
+		}
+	    }
+
+	    if (shell != 0xFF)
+	    {
+		uint32_t bullet_offs = (0x60 + (shell * 4));
+		uint32_t ypos = y;
+		uint32_t xpos = (255 - obj_ram.at(bullet_offs + 3));
+
+		xpos -= 4;
+
+		for (int i = 0; i < 4; i++)
+		{
+		    bitmap->setPixel(xpos, ypos, white());
+		    xpos += 1;
+		}
+	    }
+
+	    if (missile != 0xFF)
+	    {
+		uint32_t bullet_offs = (0x60 + (missile * 4));
+		uint32_t ypos = y;
+		uint32_t xpos = (255 - obj_ram.at(bullet_offs + 3));
+
+		xpos -= 4;
+
+		for (int i = 0; i < 4; i++)
+		{
+		    bitmap->setPixel(xpos, ypos, yellow());
+		    xpos += 1;
 		}
 	    }
 	}
@@ -120,6 +269,11 @@ namespace berrn
 	    int ypos = (base_y + py);
 
 	    ypos = ((ypos - scroll) % 256);
+
+	    if (ypos <= -8)
+	    {
+		ypos += 256;
+	    }
 
 	    uint8_t color = pal_rom.at((color_offs * 4) + tile_color);
 	    set_pixel(xpos, ypos, color);

@@ -110,6 +110,39 @@ namespace berrn
 		return samples;
 	    }
 
+	    int load_raw(vector<int16_t> data, uint32_t num_samples, uint32_t frequency)
+	    {
+		if (data.empty())
+		{
+		    cout << "Invalid data buffer" << endl;
+		    return -1;
+		}
+
+		berrnsource sample;
+
+		sample.buffer.resize((num_samples * 2), 0);
+		sample.buffer_size = sample.buffer.size();
+		sample.buffer_pos = 0;
+		sample.sample_rate = frequency;
+		sample.end_pos = num_samples;
+		sample.playback_rate = berrn_fx_from_float(float(frequency) / get_sample_rate());
+		sample.is_loop = false;
+		sample.is_paused = true;
+		sample.output.fill(0);
+
+		for (size_t index = 0; index < data.size(); index++)
+		{
+		    size_t buffer_offs = (index * 2);
+		    sample.buffer.at(buffer_offs) = data.at(index);
+		    sample.buffer.at(buffer_offs + 1) = data.at(index);
+		}
+
+		size_t file_id = num_files;
+		sample_files.push_back(sample);
+		num_files = sample_files.size();
+		return file_id;
+	    }
+
 	    int load_sample(string filename)
 	    {
 		if (front == NULL)
@@ -120,10 +153,8 @@ namespace berrn
 
 		fs::path cur_path = fs::current_path();
 		cur_path.append("samples");
-		cur_path.append(driver.drivername());
-		cur_path.append(filename);
 
-		vector<uint8_t> file_vec = front->readfile(cur_path.string());
+		vector<uint8_t> file_vec = front->readfile(cur_path.generic_string(), driver.drivername(), filename);
 
 		if (file_vec.empty())
 		{
@@ -183,8 +214,21 @@ namespace berrn
 		    return false;
 		}
 
-		sample_files.at(sample_num).is_paused = false;
+		auto &sample = sample_files.at(sample_num);
+		sample.buffer_pos = 0;
+		sample.is_paused = false;
 		return true;
+	    }
+
+	    bool is_playing(int sample_num)
+	    {
+		if (!inRange(sample_num, 0, num_files))
+		{
+		    return true;
+		}
+
+		bool is_paused = sample_files.at(sample_num).is_paused;
+		return !is_paused;
 	    }
 	    
 	    bool stop_sound(int sample_num)

@@ -77,6 +77,10 @@ namespace berrn
 		data |= main_rom.at(addr + 1);
 	    }
 	}
+	else if (inRange(addr, 0x104000, 0x105000))
+	{
+	    data = main_core.readPalette(upper, lower, addr);
+	}
 	else if (addr == 0x10A004)
 	{
 	    if (upper)
@@ -119,6 +123,10 @@ namespace berrn
 	else if (inRange(addr, 0x80000, 0x100000))
 	{
 	    return;
+	}
+	else if (inRange(addr, 0x104000, 0x105000))
+	{
+	    main_core.writePalette(upper, lower, addr, data);
 	}
 	else if (addr == 0x108000)
 	{
@@ -218,7 +226,6 @@ namespace berrn
 	{
 	    if (current_scanline == 0)
 	    {
-		cout << "Sprite DMA IRQ..." << endl;
 		main_proc->fire_interrupt_level(5);
 	    }
 
@@ -227,7 +234,16 @@ namespace berrn
 		cout << "Possible VBlank IRQ..." << endl;
 		exit(0);
 	    }
+
+	    current_scanline += 1;
+
+	    if (current_scanline == 256)
+	    {
+		current_scanline = 0;
+	    }
 	});
+
+	palette = new BerrnPaletteXBGR555(1024);
     }
 
     XMenCore::~XMenCore()
@@ -265,6 +281,18 @@ namespace berrn
     void XMenCore::writeIRQ(bool line)
     {
 	is_vblank_irq = line;
+    }
+
+    uint16_t XMenCore::readPalette(bool upper, bool lower, uint32_t addr)
+    {
+	addr &= 0xFFF;
+	return palette->read16(upper, lower, addr);
+    }
+
+    void XMenCore::writePalette(bool upper, bool lower, uint32_t addr, uint16_t data)
+    {
+	addr &= 0xFFF;
+	palette->write16(upper, lower, addr, data);
     }
 
     driverxmen::driverxmen()
@@ -338,9 +366,9 @@ namespace berrn
 		cout << "P1 down button has been " << key_state << endl;
 	    }
 	    break;
-	    case BerrnInput::BerrnFireP1:
+	    case BerrnInput::BerrnButton1P1:
 	    {
-		cout << "P1 fire button has been " << key_state << endl;
+		cout << "P1 button 1 has been " << key_state << endl;
 	    }
 	    break;
 	    default: break;

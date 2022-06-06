@@ -109,14 +109,20 @@ namespace berrn
 
 	    }
 
-	    virtual void fire_nmi()
+	    virtual void fire_nmi(bool is_pending = true)
 	    {
+		(void)is_pending;
 		return;
 	    }
 
 	    virtual void fire_interrupt(bool is_line = true)
 	    {
 		(void)is_line;
+		return;
+	    }
+
+	    virtual void clear_interrupt()
+	    {
 		return;
 	    }
 

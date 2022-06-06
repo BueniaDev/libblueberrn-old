@@ -36,7 +36,6 @@ namespace berrn
 	    ~driverexample();
 
 	    string drivername();
-	    bool hasdriverROMs();
 
 	    bool drvinit();
 	    void drvshutdown();

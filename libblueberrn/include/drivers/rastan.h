@@ -22,6 +22,7 @@
 #include <libblueberrn_api.h>
 #include <driver.h>
 #include <cpu/motorola68k.h>
+#include <video/rastan.h>
 using namespace berrn;
 using namespace std;
 
@@ -60,6 +61,9 @@ namespace berrn
 	    void stop_core();
 	    void run_core();
 
+	    uint16_t readPC080SN(int bank, bool upper, bool lower, uint32_t addr);
+	    void writePC080SN(int bank, bool upper, bool lower, uint32_t addr, uint16_t data);
+
 	private:
 	    berrndriver &driver;
 
@@ -68,6 +72,8 @@ namespace berrn
 	    BerrnCPU *main_cpu = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
+
+	    rastanvideo *tile_video = NULL;
     };
 
     class LIBBLUEBERRN_API driverrastan : public berrndriver
