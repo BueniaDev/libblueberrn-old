@@ -27,6 +27,7 @@
 #include <audio/ym2151.h>
 #include <konami/k007232.h>
 #include <audio/samples.h>
+#include <audio/upd7759.h>
 using namespace berrn;
 using namespace std;
 
@@ -73,6 +74,14 @@ namespace berrn
 
 	    void initTitle();
 
+	    uint8_t readLatch();
+	    void writeLatch(uint8_t data);
+
+	    uint8_t readBusy();
+
+	    void writeStart(uint8_t data);
+	    void writePort(uint8_t data);
+
 	    vector<uint8_t> sound_rom;
 	    array<uint8_t, 0x800> sound_ram;
 
@@ -81,13 +90,14 @@ namespace berrn
 	    ym2151device *opm = NULL;
 	    k007232device *k007232 = NULL;
 	    samplesdevice *title = NULL;
+	    upd7759device *upd = NULL;
 
 	    uint8_t internal_latch = 0;
 
 	    int title_id = 0;
     };
 
-    class LIBBLUEBERRN_API TMNTCore : public BerrnInterface
+    class LIBBLUEBERRN_API TMNTCore
     {
 	public:
 	    TMNTCore(berrndriver &drv);
@@ -123,12 +133,10 @@ namespace berrn
 	    int64_t time_until_pos(int vpos);
 
 	    TMNTM68K *main_inter = NULL;
-	    BerrnM68KProcessor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnM68KCPU *main_cpu = NULL;
 
 	    TMNTZ80 *sound_inter = NULL;
-	    BerrnZ80Processor *sound_proc = NULL;
-	    BerrnCPU *sound_cpu = NULL;
+	    BerrnZ80CPU *sound_cpu = NULL;
 
 	    tmntvideo *video = NULL;
 	    BerrnTimer *vblank_timer = NULL;
@@ -150,6 +158,48 @@ namespace berrn
 	    ~drivertmnt();
 
 	    string drivername();
+
+	    bool drvinit();
+	    void drvshutdown();
+	    void drvrun();
+
+	    void process_audio();
+
+	    void keychanged(BerrnInput key, bool is_pressed);
+
+	private:
+	    TMNTCore *core = NULL;
+    };
+
+    class LIBBLUEBERRN_API drivertmntu : public berrndriver
+    {
+	public:
+	    drivertmntu();
+	    ~drivertmntu();
+
+	    string drivername();
+	    string parentname();
+
+	    bool drvinit();
+	    void drvshutdown();
+	    void drvrun();
+
+	    void process_audio();
+
+	    void keychanged(BerrnInput key, bool is_pressed);
+
+	private:
+	    TMNTCore *core = NULL;
+    };
+
+    class LIBBLUEBERRN_API drivertmht : public berrndriver
+    {
+	public:
+	    drivertmht();
+	    ~drivertmht();
+
+	    string drivername();
+	    string parentname();
 
 	    bool drvinit();
 	    void drvshutdown();

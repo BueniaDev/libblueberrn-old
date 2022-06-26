@@ -34,8 +34,7 @@ namespace berrn
     BerrnCentipedeBase::BerrnCentipedeBase(berrndriver &drv) : driver(drv)
     {
 	auto &scheduler = driver.get_scheduler();
-	main_proc = new Berrn6502Processor(1512000, *this);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new Berrn6502CPU(driver, 1512000, *this);
 
 	irq_timer = new BerrnTimer("IRQ", scheduler, [&](int64_t, int64_t)
 	{
@@ -44,7 +43,7 @@ namespace berrn
 	    if (testbit(current_scanline, 4))
 	    {
 		bool is_irq_line = testbit((current_scanline - 1), 5);
-		main_proc->fire_interrupt(is_irq_line);
+		main_cpu->fireInterrupt(is_irq_line);
 	    }
 
 	    if (current_scanline == 256)
@@ -65,9 +64,9 @@ namespace berrn
 	main_rom = driver.get_rom_region("maincpu");
 	main_ram.fill(0);
 	temp_vram.fill(0);
-	main_proc->fire_interrupt(false);
 	earom_control_write(0x00);
-	main_proc->init();
+	main_cpu->fireInterrupt(false);
+	main_cpu->init();
 	scheduler.add_device(main_cpu);
 	// VBlank time / 256
 	irq_timer->start(65, true);
@@ -78,7 +77,7 @@ namespace berrn
     void BerrnCentipedeBase::stopcore()
     {
 	main_rom.clear();
-	main_proc->shutdown();
+	main_cpu->shutdown();
     }
 
     void BerrnCentipedeBase::runcore()

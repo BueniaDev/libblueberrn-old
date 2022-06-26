@@ -46,6 +46,11 @@ namespace berrn
 	stopLog();
     }
 
+    uint32_t k052109video::create_tilemap_addr(uint32_t tile_num, uint8_t color_attrib)
+    {
+	return gfx_chip.create_tileaddr(tile_num, color_attrib);
+    }
+
     array<int, (512 * 256)> k052109video::render(int layer)
     {
 	if (!inRange(layer, 0, 3))
@@ -67,14 +72,26 @@ namespace berrn
 
 	    if (tilecb)
 	    {
-		data = tilecb(code, attrib, bank);
+		data = tilecb(0, code, attrib, bank);
+	    }
+
+	    return data;
+	};
+
+	auto gfx_func = [&](int layer, uint8_t code, uint8_t attrib, int bank) -> uint32_t
+	{
+	    uint32_t data = 0;
+
+	    if (tilecb)
+	    {
+		data = tilecb(layer, code, attrib, bank);
 	    }
 
 	    return data;
 	};
 
 	tile_chip.set_tile_read_cb(tile_func);
-	gfx_chip.set_tile_callback(tile_func);
+	gfx_chip.set_tile_callback(gfx_func);
     }
 
     void k052109video::logRender()
@@ -94,6 +111,16 @@ namespace berrn
 	close_file();
     }
 
+    bool k052109video::isIRQEnabled()
+    {
+	return tile_chip.irq_enabled();
+    }
+
+    bool k052109video::getRMRD()
+    {
+	return tile_chip.get_rmrd_line();
+    }
+
     uint8_t k052109video::read(uint16_t addr)
     {
 	return tile_chip.read(addr);
@@ -107,6 +134,42 @@ namespace berrn
 	if (is_ben)
 	{
 	    gfx_chip.write(data);
+	}
+    }
+
+    uint16_t k052109video::read16(bool upper, bool lower, uint32_t addr)
+    {
+	addr >>= 1;
+	addr = ((addr & 0x7FF) | ((addr & 0x3000) >> 1));
+
+	uint16_t data = 0;
+
+	if (upper)
+	{
+	    data |= (read(addr) << 8);
+	}
+
+	if (lower)
+	{
+	    data |= read((addr + 0x2000));
+	}
+
+	return data;
+    }
+
+    void k052109video::write16(bool upper, bool lower, uint32_t addr, uint16_t data)
+    {
+	addr >>= 1;
+	addr = ((addr & 0x7FF) | ((addr & 0x3000) >> 1));
+
+	if (upper)
+	{
+	    write(addr, (data >> 8));
+	}
+
+	if (lower)
+	{
+	    write((addr + 0x2000), (data & 0xFF));
 	}
     }
 

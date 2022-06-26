@@ -21,8 +21,6 @@
 
 #include <libblueberrn_api.h>
 #include <driver.h>
-#include <iostream>
-#include <string>
 #include <cpu/konami2.h>
 using namespace berrn;
 using namespace std;
@@ -41,12 +39,14 @@ namespace berrn
 	    void shutdown();
 
 	    uint8_t readCPU8(uint16_t addr);
+	    void writeCPU8(uint16_t addr, uint8_t data);
 
 	private:
 	    berrndriver &driver;
 	    AliensCore &core;
 
 	    vector<uint8_t> main_rom;
+	    array<uint8_t, 0x1C00> main_ram;
     };
 
     class LIBBLUEBERRN_API AliensCore
@@ -63,8 +63,7 @@ namespace berrn
 	    berrndriver &driver;
 
 	    AliensMainInterface *main_inter = NULL;
-	    BerrnKonami2Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnKonami2CPU *main_cpu = NULL;
     };
 
     class LIBBLUEBERRN_API driveraliens : public berrndriver

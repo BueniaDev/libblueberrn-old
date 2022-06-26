@@ -284,12 +284,10 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter = new BombJackMain(driver, *this);
-	main_proc = new BerrnZ80Processor(4000000, *main_inter);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnZ80CPU(driver, 4000000, *main_inter);
 
 	sound_inter = new BombJackSound(driver, *this);
-	sound_proc = new BerrnZ80Processor(3000000, *sound_inter);
-	sound_cpu = new BerrnCPU(scheduler, *sound_proc);
+	sound_cpu = new BerrnZ80CPU(driver, 3000000, *sound_inter);
 
 	video = new bombjackvideo(driver);
 
@@ -297,10 +295,10 @@ namespace berrn
 	{
 	    if (is_nmi_enabled)
 	    {
-		main_proc->fire_nmi();
+		main_cpu->fireNMI();
 	    }
 
-	    sound_proc->fire_nmi();
+	    sound_cpu->fireNMI();
 
 	    video->updatePixels();
 	});
@@ -315,9 +313,9 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter->init();
-	main_proc->init();
+	main_cpu->init();
 	sound_inter->init();
-	sound_proc->init();
+	sound_cpu->init();
 	video->init();
 	vblank_timer->start(time_in_hz(60), true);
 	scheduler.add_device(main_cpu);
@@ -330,9 +328,9 @@ namespace berrn
     {
 	vblank_timer->stop();
 	video->shutdown();
-	sound_proc->shutdown();
+	sound_cpu->shutdown();
 	sound_inter->shutdown();
-	main_proc->shutdown();
+	main_cpu->shutdown();
 	main_inter->shutdown();
     }
 
@@ -381,7 +379,7 @@ namespace berrn
 
 	if (!is_nmi_enabled)
 	{
-	    main_proc->fire_nmi(false);
+	    main_cpu->fireNMI(false);
 	}
     }
 

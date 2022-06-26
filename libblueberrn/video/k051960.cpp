@@ -35,6 +35,12 @@ namespace berrn
     void k051960video::init()
     {
 	obj_ram.fill(0);
+	shadow_config = 0;
+    }
+
+    void k051960video::setROM(vector<uint8_t> &rom)
+    {
+	obj_rom = vector<uint8_t>(rom.begin(), rom.end());
     }
 
     void k051960video::setTiles(vector<uint8_t> &tiles)
@@ -54,6 +60,10 @@ namespace berrn
 
     void k051960video::render(int min_priority, int max_priority)
     {
+	// TODO: Implement the following features:
+	// Priority blending
+	// Sprite zooming
+
 	(void)min_priority;
 	(void)max_priority;
 
@@ -97,9 +107,22 @@ namespace berrn
 
 	    uint16_t sprite_num = (((attrib1 & 0x1F) << 8) | attrib2);
 	    uint8_t color_attrib = attrib3;
-	    int priority = 0;
+	    uint8_t priority = 0;
 
-	    int is_shadow = 0;
+	    bool is_shadow = false;
+
+	    if (testbit(shadow_config, 2))
+	    {
+		is_shadow = false;
+	    }
+	    else if (testbit(shadow_config, 1))
+	    {
+		is_shadow = true;
+	    }
+	    else
+	    {
+		is_shadow = testbit(color_attrib, 7);
+	    }
 
 	    if (spritecb)
 	    {
@@ -180,14 +203,14 @@ namespace berrn
 			sprite_code += xoffset.at(xoffs);
 			sprite_code += yoffset.at(yoffs);
 
-			drawNormalSprite(sprite_code, color_attrib, xcoord, ycoord, is_flipx, is_flipy);
+			drawNormalSprite(sprite_code, color_attrib, priority, is_shadow, xcoord, ycoord, is_flipx, is_flipy);
 		    }
 		}
 	    }
 	}
     }
 
-    void k051960video::drawNormalSprite(uint32_t sprite_num, uint8_t pal_num, int xcoord, int ycoord, bool flipx, bool flipy)
+    void k051960video::drawNormalSprite(uint32_t sprite_num, uint8_t pal_num, uint8_t priority, bool shadow, int xcoord, int ycoord, bool flipx, bool flipy)
     {
 	uint32_t sprite_offs = (sprite_num * 256);
 
@@ -226,8 +249,19 @@ namespace berrn
 
 	    size_t pixel_offs = (xpos + (ypos * 512));
 
+	    bool is_shadow = false;
+
+	    if (color_num == 15)
+	    {
+		is_shadow = (shadow && !testbit(shadow_config, 0));
+	    }
+	    else
+	    {
+		is_shadow = testbit(shadow_config, 0);
+	    }
+
 	    auto &obj_pixel = obj_buffer.at(pixel_offs);
-	    obj_pixel = (color_num | (pal_num << 4));
+	    obj_pixel = (color_num | (pal_num << 4) | (priority << 12) | (is_shadow << 20));
 	}
     }
 
@@ -236,16 +270,56 @@ namespace berrn
 	return obj_buffer;
     }
 
+    uint8_t k051960video::fetchROMData(int offs)
+    {
+	uint32_t addr = rom_offset;
+	addr += ((sprite_rom_bank[0] << 8) + ((sprite_rom_bank[1] & 0x3) << 16));
+	uint16_t sprite_code = ((addr & 0x3FFE0) >> 5);
+	int off1 = (addr & 0x1F);
+	uint8_t color = (((sprite_rom_bank[1] & 0xFC) << 2) + ((sprite_rom_bank[2] & 0x3) << 6));
+	uint8_t priority = 0;
+	bool is_shadow = false;
+
+	if (spritecb)
+	{
+	    spritecb(sprite_code, color, priority, is_shadow);
+	}
+
+	addr = ((sprite_code << 7) | (off1 << 2) | (offs & 3));
+	addr &= (obj_rom.size() - 1);
+
+	return obj_rom.at(addr);
+    }
+
     uint8_t k051960video::read(uint16_t addr)
     {
 	uint8_t data = 0;
 	if (addr <= 7)
 	{
-	    cout << "Reading value from K051960 address of " << hex << int(addr) << endl;
+	    switch (addr)
+	    {
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+		{
+		    data = fetchROMData((addr & 3));
+		}
+		break;
+		default: cout << "Reading value from K051960 address of " << hex << int(addr) << endl; break;
+	    }
 	}
 	else if (inRange(addr, 0x400, 0x800))
 	{
-	    data = obj_ram.at((addr & 0x3FF));
+	    if (is_rmrd)
+	    {
+		rom_offset = ((addr & 0x3FC) >> 2);
+		data = fetchROMData(addr & 3);
+	    }
+	    else
+	    {
+		data = obj_ram.at((addr & 0x3FF));
+	    }
 	}
 
 	return data;
@@ -255,7 +329,28 @@ namespace berrn
     {
 	if (addr <= 7)
 	{
-	    cout << "Writing value of " << hex << int(data) << " to K051960 address of " << hex << int(addr) << endl;
+	    switch (addr)
+	    {
+		case 0:
+		{
+		    cout << "Writing value of " << hex << int(data) << " to K051960 address of 0" << endl;
+		    is_rmrd = testbit(data, 5);
+		}
+		break;
+		case 1:
+		{
+		    shadow_config = (data & 0x7);
+		}
+		break;
+		case 2:
+		case 3:
+		case 4:
+		{
+		    sprite_rom_bank.at(addr - 2) = data;
+		}
+		break;
+		default: cout << "Writing value of " << hex << int(data) << " to K051960 address of " << hex << int(addr) << endl; break;
+	    }
 	}
 	else if (inRange(addr, 0x400, 0x800))
 	{

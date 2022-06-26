@@ -161,13 +161,12 @@ namespace berrn
 
 	// 20 mHz is not really the actual clock rate of the main Z80
 	// (see notes for details)
-	main_proc = new BerrnZ80Processor(20000000, *main_inter);
-	main_proc->set_prescalers(5, 2); // See notes for details
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnZ80CPU(driver, 20000000, *main_inter);
+	main_cpu->setPrescalers(5, 2); // See notes for details
 
 	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
 	{
-	    main_proc->fire_interrupt8();
+	    main_cpu->fireInterrupt8();
 	});
     }
 
@@ -179,11 +178,11 @@ namespace berrn
     bool SegaSystem1::init_core()
     {
 	auto &scheduler = driver.get_scheduler();
-	scheduler.set_quantum(time_in_hz(6000));
-	scheduler.add_device(main_cpu);
 	vblank_timer->start(16640, true);
 	main_inter->init();
-	main_proc->init();
+	main_cpu->init();
+	scheduler.set_quantum(time_in_hz(6000));
+	scheduler.add_device(main_cpu);
 	return true;
     }
 
@@ -191,7 +190,7 @@ namespace berrn
     {
 	vblank_timer->stop();
 	main_inter->shutdown();
-	main_proc->shutdown();
+	main_cpu->shutdown();
     }
 
     void SegaSystem1::run_core()

@@ -80,8 +80,7 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter = new BoscoInterface(driver, *this);
-	main_proc = new BerrnZ80Processor(3072000, *main_inter);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnZ80CPU(driver, 3072000, *main_inter);
 
 	n06xx_0 = new namco06xx(driver, 48000);
     }
@@ -203,7 +202,7 @@ namespace berrn
 	auto &scheduler = driver.get_scheduler();
 	scheduler.set_quantum(time_in_hz(6000));
 	main_inter->init("maincpu");
-	main_proc->init();
+	main_cpu->init();
 	scheduler.add_device(main_cpu);
 	n06xx_0->set_maincpu(main_cpu);
 	video_ram.fill(0);
@@ -212,7 +211,7 @@ namespace berrn
 
     void BoscoCore::stop_core()
     {
-	main_proc->shutdown();
+	main_cpu->shutdown();
 	main_inter->shutdown();
     }
 

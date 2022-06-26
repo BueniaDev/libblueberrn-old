@@ -104,12 +104,10 @@ namespace berrn
 	    berrndriver &driver;
 
 	    BombJackMain *main_inter = NULL;
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    BombJackSound *sound_inter = NULL;
-	    BerrnZ80Processor *sound_proc = NULL;
-	    BerrnCPU *sound_cpu = NULL;
+	    BerrnZ80CPU *sound_cpu = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
 

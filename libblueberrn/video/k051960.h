@@ -28,8 +28,8 @@ using namespace std;
 
 namespace berrn
 {
-    using objbuffer = array<uint32_t, (512 * 256)>;
-    using k051960callback = function<void(uint16_t&, uint8_t&, int&, int&)>;
+    using objbuffer = array<int, (512 * 256)>;
+    using k051960callback = function<void(uint16_t&, uint8_t&, uint8_t&, bool&)>;
     class k051960video
     {
 	public:
@@ -37,6 +37,7 @@ namespace berrn
 	    ~k051960video();
 
 	    void init();
+	    void setROM(vector<uint8_t> &rom);
 	    void setTiles(vector<uint8_t> &tiles);
 	    void setSpriteCallback(k051960callback cb);
 	    void shutdown();
@@ -50,16 +51,27 @@ namespace berrn
 	private:
 	    berrndriver &driver;
 
+	    vector<uint8_t> obj_rom;
 	    vector<uint8_t> obj_tiles;
 
 	    array<uint8_t, 0x400> obj_ram;
 
-	    void drawNormalSprite(uint32_t sprite_num, uint8_t pal_num, int xcoord, int ycoord, bool flipx, bool flipy);
+	    bool is_rmrd = false;
+
+	    array<uint8_t, 4> sprite_rom_bank;
+
+	    uint8_t fetchROMData(int offs);
+
+	    uint32_t rom_offset = 0;
+
+	    void drawNormalSprite(uint32_t sprite_num, uint8_t pal_num, uint8_t priority, bool shadow, int xcoord, int ycoord, bool flipx, bool flipy);
 
 	    objbuffer obj_buffer;
 
 	    k051960callback spritecb;
+
+	    int shadow_config = 0;
     };
 };
 
-#endif // BERRN_GALAGA_VIDEO_H
+#endif // BERRN_K051960MAME_VIDEO_H

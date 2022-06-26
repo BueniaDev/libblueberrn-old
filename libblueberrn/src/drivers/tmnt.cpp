@@ -41,8 +41,68 @@ namespace berrn
 	    berrn_rom_load32_word("963a16.k6", 0x100002, 0x80000)
 	berrn_rom_region("sprprom", 0x0100, 0)
 	    berrn_rom_load("963a30.g7", 0x0000, 0x0100)
+	berrn_rom_region("priprom", 0x0100, 0)
+	    berrn_rom_load("963a31.g19", 0x0000, 0x0100)
 	berrn_rom_region("k007232", 0x20000, 0)
 	    berrn_rom_load("963a26.c13", 0x00000, 0x20000)
+	berrn_rom_region("upd", 0x20000, 0)
+	    berrn_rom_load("963a27.d18", 0x00000, 0x20000)
+	berrn_rom_region("title", 0x80000, 0)
+	    berrn_rom_load("963a25.d5", 0x00000, 0x80000)
+    berrn_rom_end
+
+    berrn_rom_start(tmntu)
+	berrn_rom_region("maincpu", 0x60000, 0)
+	    berrn_rom_load16_byte("963-r23.j17", 0x00000, 0x20000)
+	    berrn_rom_load16_byte("963-r24.k17", 0x00001, 0x20000)
+	    berrn_rom_load16_byte("963-r21.j15", 0x40000, 0x10000)
+	    berrn_rom_load16_byte("963-r22.k15", 0x40001, 0x10000)
+	berrn_rom_region("soundcpu", 0x10000, 0)
+	    berrn_rom_load("963e20.g13", 0x0000, 0x8000)
+	berrn_rom_region("k052109", 0x100000, 0)
+	    berrn_rom_load32_word("963a28.h27", 0x000000, 0x80000)
+	    berrn_rom_load32_word("963a29.k27", 0x000002, 0x80000)
+	berrn_rom_region("k051960", 0x200000, 0)
+	    berrn_rom_load32_word("963a17.h4", 0x000000, 0x80000)
+	    berrn_rom_load32_word("963a15.k4", 0x000002, 0x80000)
+	    berrn_rom_load32_word("963a18.h6", 0x100000, 0x80000)
+	    berrn_rom_load32_word("963a16.k6", 0x100002, 0x80000)
+	berrn_rom_region("sprprom", 0x0100, 0)
+	    berrn_rom_load("963a30.g7", 0x0000, 0x0100)
+	berrn_rom_region("priprom", 0x0100, 0)
+	    berrn_rom_load("963a31.g19", 0x0000, 0x0100)
+	berrn_rom_region("k007232", 0x20000, 0)
+	    berrn_rom_load("963a26.c13", 0x00000, 0x20000)
+	berrn_rom_region("upd", 0x20000, 0)
+	    berrn_rom_load("963a27.d18", 0x00000, 0x20000)
+	berrn_rom_region("title", 0x80000, 0)
+	    berrn_rom_load("963a25.d5", 0x00000, 0x80000)
+    berrn_rom_end
+
+    berrn_rom_start(tmht)
+	berrn_rom_region("maincpu", 0x60000, 0)
+	    berrn_rom_load16_byte("963-f23.j17", 0x00000, 0x20000)
+	    berrn_rom_load16_byte("963-f24.k17", 0x00001, 0x20000)
+	    berrn_rom_load16_byte("963-f21.j15", 0x40000, 0x10000)
+	    berrn_rom_load16_byte("963-f22.k15", 0x40001, 0x10000)
+	berrn_rom_region("soundcpu", 0x10000, 0)
+	    berrn_rom_load("963e20.g13", 0x0000, 0x8000)
+	berrn_rom_region("k052109", 0x100000, 0)
+	    berrn_rom_load32_word("963a28.h27", 0x000000, 0x80000)
+	    berrn_rom_load32_word("963a29.k27", 0x000002, 0x80000)
+	berrn_rom_region("k051960", 0x200000, 0)
+	    berrn_rom_load32_word("963a17.h4", 0x000000, 0x80000)
+	    berrn_rom_load32_word("963a15.k4", 0x000002, 0x80000)
+	    berrn_rom_load32_word("963a18.h6", 0x100000, 0x80000)
+	    berrn_rom_load32_word("963a16.k6", 0x100002, 0x80000)
+	berrn_rom_region("sprprom", 0x0100, 0)
+	    berrn_rom_load("963a30.g7", 0x0000, 0x0100)
+	berrn_rom_region("priprom", 0x0100, 0)
+	    berrn_rom_load("963a31.g19", 0x0000, 0x0100)
+	berrn_rom_region("k007232", 0x20000, 0)
+	    berrn_rom_load("963a26.c13", 0x00000, 0x20000)
+	berrn_rom_region("upd", 0x20000, 0)
+	    berrn_rom_load("963a27.d18", 0x00000, 0x20000)
 	berrn_rom_region("title", 0x80000, 0)
 	    berrn_rom_load("963a25.d5", 0x00000, 0x80000)
     berrn_rom_end
@@ -100,7 +160,7 @@ namespace berrn
 	{
 	    if (lower)
 	    {
-		data = main_core.readPalette((addr >> 1));
+		data = main_core.readPalette(addr);
 	    }
 	}
 	else if (addr == 0xA0000)
@@ -169,7 +229,7 @@ namespace berrn
 	}
 	else if (inRange(addr, 0x100000, 0x108000))
 	{
-	    data = main_core.readk052109_noA12(upper, lower, (addr >> 1));
+	    data = main_core.readk052109_noA12(upper, lower, addr);
 	}
 	else if (inRange(addr, 0x140000, 0x140800))
 	{
@@ -216,7 +276,7 @@ namespace berrn
 	{
 	    if (lower)
 	    {
-		main_core.writePalette((addr >> 1), data);
+		main_core.writePalette(addr, data);
 	    }
 	}
 	else if (addr == 0xA0000)
@@ -244,13 +304,13 @@ namespace berrn
 	}
 	else if (inRange(addr, 0x100000, 0x108000))
 	{
-	    main_core.writek052109_noA12(upper, lower, (addr >> 1), data);
+	    main_core.writek052109_noA12(upper, lower, addr, data);
 	}
 	else if (addr == 0x10E800)
 	{
 	    return; // ???
 	}
-	else if (inRange(addr, 0x140000, 0x1407FF))
+	else if (inRange(addr, 0x140000, 0x140800))
 	{
 	    uint32_t sprite_addr = (addr & 0x7FE);
 
@@ -275,6 +335,7 @@ namespace berrn
 	opm = new ym2151device(driver);
 	k007232 = new k007232device(driver);
 	title = new samplesdevice(driver);
+	upd = new upd7759device(driver);
     }
 
     TMNTZ80::~TMNTZ80()
@@ -294,15 +355,20 @@ namespace berrn
 
 	title->init();
 	initTitle();
+	upd->init(640000);
+	upd->write_start(false);
+	upd->write_reset(true);
 	sound_rom = driver.get_rom_region("soundcpu");
 	sound_ram.fill(0);
     }
 
     void TMNTZ80::shutdown()
     {
+	title_samples.clear();
 	title->stop_sound(title_id);
 	title->shutdown();
 	k007232->shutdown();
+	upd->shutdown();
 	opm->shutdown();
 	sound_rom.clear();
     }
@@ -332,7 +398,7 @@ namespace berrn
 	}
 	else if (addr == 0x9000)
 	{
-	    data = internal_latch;
+	    data = readLatch();
 	}
 	else if (addr == 0xA000)
 	{
@@ -345,14 +411,12 @@ namespace berrn
 	}
 	else if (inRangeEx(addr, 0xC000, 0xC001))
 	{
-	    // cout << "Reading YM2151 port of " << dec << int((addr - 0xC000)) << endl;
 	    int port = (addr - 0xC000);
 	    data = opm->readIO(port);
 	}
 	else if (addr == 0xF000)
 	{
-	    cout << "Reading uPD7759 busy line..." << endl;
-	    data = 0x00;
+	    data = readBusy();
 	}
 	else
 	{
@@ -374,28 +438,7 @@ namespace berrn
 	}
 	else if (addr == 0x9000)
 	{
-	    if (testbit(data, 1))
-	    {
-		cout << "Asserting uPD7759 reset line..." << endl;
-	    }
-	    else
-	    {
-		cout << "Clearing uPD7759 reset line..." << endl;
-	    }
-
-	    if (testbit(data, 2))
-	    {
-		if (!title->is_playing(title_id))
-		{
-		    title->play_sound(title_id);
-		}
-	    }
-	    else
-	    {
-		title->stop_sound(title_id);
-	    }
-
-	    internal_latch = data;
+	    writeLatch(data);
 	}
 	else if (inRangeEx(addr, 0xB000, 0xB00D))
 	{
@@ -409,18 +452,11 @@ namespace berrn
 	}
 	else if (addr == 0xD000)
 	{
-	    cout << "Writing value of " << hex << int(data) << " to uPD7759 port" << endl;
+	    writePort(data);
 	}
 	else if (addr == 0xE000)
 	{
-	    if (testbit(data, 0))
-	    {
-		cout << "Asserting uPD7759 start line..." << endl;
-	    }
-	    else
-	    {
-		cout << "Clearing uPD7759 start line..." << endl;
-	    }
+	    writeStart(data);
 	}
 	else
 	{
@@ -428,26 +464,70 @@ namespace berrn
 	}
     }
 
+    uint8_t TMNTZ80::readLatch()
+    {
+	return internal_latch;
+    }
+
+    void TMNTZ80::writeLatch(uint8_t data)
+    {
+	upd->write_reset(testbit(data, 1));
+
+	if (testbit(data, 2))
+	{
+	    if (!title->is_playing(title_id))
+	    {
+		title->play_sound(title_id);
+	    }
+	}
+	else
+	{
+	    title->stop_sound(title_id);
+	}
+
+	internal_latch = data;
+    }
+
+    uint8_t TMNTZ80::readBusy()
+    {
+	return upd->read_busy() ? 0x01 : 0x00;
+    }
+
+    void TMNTZ80::writeStart(uint8_t data)
+    {
+	upd->write_start(testbit(data, 0));
+    }
+
+    void TMNTZ80::writePort(uint8_t data)
+    {
+	upd->write_port(data);
+    }
+
     void TMNTZ80::processAudio()
     {
 	auto opm_samples = opm->fetch_samples();
 	auto k007232_samples = k007232->fetch_samples();
 	auto title_samples = title->fetch_samples();
+	auto upd_samples = upd->fetch_samples();
 
 	for (auto &ym_sample : opm_samples)
 	{
 	    driver.add_mono_sample(ym_sample);
 	}
 
+	/*
 	for (auto &k007232_sample : k007232_samples)
 	{
 	    driver.add_mono_sample(k007232_sample, 0.33);
 	}
 
-	for (auto &title_sample : title_samples)
+	for (auto &upd_sample : upd_samples)
 	{
-	    driver.add_mono_sample(title_sample, 0.5);
+	    driver.add_mono_sample(upd_sample, 0.60);
 	}
+
+	driver.add_mono_sample(title_samples[0], 0.5);
+	*/
     }
 
     TMNTCore::TMNTCore(berrndriver &drv) : driver(drv)
@@ -455,12 +535,10 @@ namespace berrn
 	auto &scheduler = driver.get_scheduler();
 
 	main_inter = new TMNTM68K(driver, *this);
-	main_proc = new BerrnM68KProcessor(8000000, *main_inter);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnM68KCPU(driver, 8000000, *main_inter);
 
 	sound_inter = new TMNTZ80(driver, *this);
-	sound_proc = new BerrnZ80Processor(3579545, *sound_inter);
-	sound_cpu = new BerrnCPU(scheduler, *sound_proc);
+	sound_cpu = new BerrnZ80CPU(driver, 3579545, *sound_inter);
 
 	video = new tmntvideo(driver);
 
@@ -468,7 +546,7 @@ namespace berrn
 	{
 	    if (is_irq_enabled)
 	    {
-		main_proc->fire_interrupt_level(5);
+		main_cpu->fireInterruptLevel(5);
 	    }
 
 	    video->updatePixels();
@@ -506,11 +584,12 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter->init();
-	main_proc->init();
+	main_cpu->init();
 	sound_inter->init();
-	sound_proc->init();
+	sound_cpu->init();
 	scheduler.add_device(main_cpu);
 	scheduler.add_device(sound_cpu);
+	vblank_start_time = 0;
 	vblank_timer->start(time_until_pos(240), false);
 	video->init();
 	coins_port = 0xFF;
@@ -524,9 +603,9 @@ namespace berrn
 	video->shutdown();
 	vblank_timer->stop();
 	sound_inter->shutdown();
-	sound_proc->shutdown();
+	sound_cpu->shutdown();
 	main_inter->shutdown();
-	main_proc->shutdown();
+	main_cpu->shutdown();
     }
 
     void TMNTCore::run_core()
@@ -536,8 +615,6 @@ namespace berrn
 
     void TMNTCore::key_changed(BerrnInput key, bool is_pressed)
     {
-	string key_state = (is_pressed) ? "pressed" : "released";
-
 	switch (key)
 	{
 	    case BerrnInput::BerrnCoin:
@@ -545,7 +622,6 @@ namespace berrn
 		coins_port = changebit(coins_port, 0, !is_pressed);
 	    }
 	    break;
-	    case BerrnInput::BerrnStartP1: break;
 	    case BerrnInput::BerrnLeftP1:
 	    {
 		p1_port = changebit(p1_port, 0, !is_pressed);
@@ -576,6 +652,14 @@ namespace berrn
 		p1_port = changebit(p1_port, 5, !is_pressed);
 	    }
 	    break;
+	    case BerrnInput::BerrnDump:
+	    {
+		if (is_pressed)
+		{
+		    video->spritedump();
+		}
+	    }
+	    break;
 	    default: break;
 	}
     }
@@ -599,49 +683,22 @@ namespace berrn
     {
 	if (prev_int && !testbit(data, 3))
 	{
-	    sound_proc->fire_interrupt8();
+	    sound_cpu->fireInterrupt8();
 	}
 
 	prev_int = testbit(data, 3);
-
 	is_irq_enabled = testbit(data, 5);
 	video->setRMRD(testbit(data, 7));
     }
 
     uint16_t TMNTCore::readk052109_noA12(bool upper, bool lower, uint32_t addr)
     {
-	addr = ((addr & 0x7FF) | ((addr & 0x3000) >> 1) | (lower << 13) | (addr & 0xC000));
-	uint16_t read_data = video->tile_read(addr);
-
-	if (upper)
-	{
-	    read_data <<= 8;
-	}
-
-	if (lower)
-	{
-	    read_data &= 0xFF;
-	}
-
-	return read_data;
+	return video->tile_read(upper, lower, addr);
     }
 
     void TMNTCore::writek052109_noA12(bool upper, bool lower, uint32_t addr, uint16_t data)
     {
-	addr = ((addr & 0x7FF) | ((addr & 0x3000) >> 1) | (lower << 13) | (addr & 0xC000));
-	uint8_t write_data = 0;
-
-	if (upper)
-	{
-	    write_data = (data >> 8);
-	}
-
-	if (lower)
-	{
-	    write_data = (data & 0xFF);
-	}
-
-	video->tile_write(addr, write_data);
+	video->tile_write(upper, lower, addr, data);
     }
 
     uint8_t TMNTCore::k051960_read(uint16_t addr)
@@ -672,7 +729,8 @@ namespace berrn
 	    case 4: data = 0xFF; break; // P4
 	    case 5: data = 0xFF; break; // DSW1
 	    case 6: data = 0x5E; break; // DSW2
-	    case 7: data = 0xFF; break; // DSW3
+	    // case 7: data = 0xFF; break; // DSW3
+	    case 7: data = 0xFB; break; // DSW3
 	    default: break; 
 	}
 
@@ -730,6 +788,106 @@ namespace berrn
     }
 
     void drivertmnt::keychanged(BerrnInput key, bool is_pressed)
+    {
+	core->key_changed(key, is_pressed);
+    }
+
+    drivertmntu::drivertmntu()
+    {
+	core = new TMNTCore(*this);
+    }
+
+    drivertmntu::~drivertmntu()
+    {
+
+    }
+
+    string drivertmntu::drivername()
+    {
+	return "tmntu";
+    }
+
+    string drivertmntu::parentname()
+    {
+	return "tmnt";
+    }
+
+    bool drivertmntu::drvinit()
+    {
+	if (!loadROM(berrn_rom_name(tmntu)))
+	{
+	    return false;
+	}
+
+	return core->init_core();
+    }
+
+    void drivertmntu::drvshutdown()
+    {
+	core->stop_core();
+    }
+  
+    void drivertmntu::drvrun()
+    {
+	core->run_core();
+    }
+
+    void drivertmntu::process_audio()
+    {
+	core->process_audio();
+    }
+
+    void drivertmntu::keychanged(BerrnInput key, bool is_pressed)
+    {
+	core->key_changed(key, is_pressed);
+    }
+
+    drivertmht::drivertmht()
+    {
+	core = new TMNTCore(*this);
+    }
+
+    drivertmht::~drivertmht()
+    {
+
+    }
+
+    string drivertmht::drivername()
+    {
+	return "tmht";
+    }
+
+    string drivertmht::parentname()
+    {
+	return "tmnt";
+    }
+
+    bool drivertmht::drvinit()
+    {
+	if (!loadROM(berrn_rom_name(tmht)))
+	{
+	    return false;
+	}
+
+	return core->init_core();
+    }
+
+    void drivertmht::drvshutdown()
+    {
+	core->stop_core();
+    }
+  
+    void drivertmht::drvrun()
+    {
+	core->run_core();
+    }
+
+    void drivertmht::process_audio()
+    {
+	core->process_audio();
+    }
+
+    void drivertmht::keychanged(BerrnInput key, bool is_pressed)
     {
 	core->key_changed(key, is_pressed);
     }

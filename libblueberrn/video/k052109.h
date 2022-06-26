@@ -30,7 +30,7 @@ using namespace std;
 
 namespace berrn
 {
-    using k052109callback = function<uint32_t(uint8_t, uint8_t, int)>;
+    using k052109callback = function<uint32_t(int, uint8_t, uint8_t, int)>;
     class k052109video
     {
 	public:
@@ -44,13 +44,27 @@ namespace berrn
 	    void stopLog();
 	    void setCallback(k052109callback cb);
 
+	    bool isIRQEnabled();
+	    bool getRMRD();
+
+	    uint32_t create_tilemap_addr(uint32_t tile_num, uint8_t color_attrib);
+
 	    array<int, (512 * 256)> render(int layer);
 
 	    void logRender();
 
 	    uint8_t read(uint16_t addr);
 	    void write(uint16_t addr, uint8_t data);
+
+	    uint16_t read16(bool upper, bool lower, uint32_t addr);
+	    void write16(bool upper, bool lower, uint32_t addr, uint16_t data);
+
 	    void setRMRD(bool line);
+
+	    array<uint8_t, 0x4000> getVRAM()
+	    {
+		return tile_chip.get_vram();
+	    }
 
 	private:
 	    berrndriver &driver;
@@ -169,4 +183,4 @@ namespace berrn
     };
 };
 
-#endif // BERRN_GALAGA_VIDEO_H
+#endif // BERRN_K052109_VIDEO_H

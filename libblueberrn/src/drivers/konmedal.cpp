@@ -29,6 +29,8 @@ namespace berrn
 	    berrn_rom_load32_byte("341-a04.4h", 0x0001, 0x10000)
 	    berrn_rom_load32_byte("341-a05.5h", 0x0002, 0x10000)
 	    berrn_rom_load32_byte("341-a06.7h", 0x0003, 0x10000)
+	berrn_rom_region("upd", 0x200000, 0)
+	    berrn_rom_load("341-a02.13c", 0x00000, 0x20000)
 	berrn_rom_region("proms", 0x400, 0)
 	    berrn_rom_load("342_a07.2d", 0x0000, 0x0100)
 	    berrn_rom_load("342_a08.3d", 0x0100, 0x0100)
@@ -44,6 +46,8 @@ namespace berrn
 	    berrn_rom_load32_byte("111_c04.4h.27c256", 0x0001, 0x8000)
 	    berrn_rom_load32_byte("111_c05.5h.27c256", 0x0002, 0x8000)
 	    berrn_rom_load32_byte("111_c06.7h.27c256", 0x0003, 0x8000)
+	berrn_rom_region("upd", 0x200000, 0)
+	    berrn_rom_load("111_c02.13c.27c010", 0x00000, 0x20000)
 	berrn_rom_region("proms", 0x400, berrn_rom_erase00)
 	    berrn_rom_load("111_c07.2d.82s129", 0x0000, 0x0100)
 	    berrn_rom_load("111_c08.3d.82s129", 0x0100, 0x0100)
@@ -54,8 +58,7 @@ namespace berrn
     BerrnShuriBoy::BerrnShuriBoy(berrndriver &drv) : driver(drv)
     {
 	auto &scheduler = driver.get_scheduler();
-	main_proc = new BerrnZ80Processor(8000000, *this);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnZ80CPU(driver, 8000000, *this);
 
 	tile_video = new shuriboyvideo(driver);
 
@@ -97,12 +100,12 @@ namespace berrn
     {
 	if ((scanline == 240) && is_irq_enabled)
 	{
-	    main_proc->fire_interrupt8();
+	    main_cpu->fireInterrupt8();
 	}
 
 	if ((scanline == 255) && is_nmi_enabled)
 	{
-	    main_proc->fire_nmi();
+	    main_cpu->fireNMI();
 	}
     }
 
@@ -128,7 +131,7 @@ namespace berrn
     bool BerrnShuriBoy::init_core()
     {
 	auto &scheduler = driver.get_scheduler();
-	main_proc->init();
+	main_cpu->init();
 	scheduler.add_device(main_cpu);
 	main_rom = driver.get_rom_region("maincpu");
 	main_ram.fill(0);
@@ -137,12 +140,40 @@ namespace berrn
 	current_scanline = 0;
 	current_rom_bank = 0;
 	tile_video->init();
+	vblank_start_time = 0;
 	vblank_timer->start(time_until_pos(240), false);
 	is_first_time = true;
 	irq_timer->start(0, false);
 	in2_port = 0xEF;
 	driver.resize(288, 224, 2);
 	return true;
+    }
+
+    void BerrnShuriBoy::stop_core()
+    {
+	tile_video->shutdown();
+	vblank_timer->stop();
+	irq_timer->stop();
+	main_rom.clear();
+	main_cpu->shutdown();
+    }
+
+    void BerrnShuriBoy::run_core()
+    {
+	driver.run_scheduler();
+    }
+
+    void BerrnShuriBoy::key_changed(BerrnInput key, bool is_pressed)
+    {
+	switch (key)
+	{
+	    case BerrnInput::BerrnService:
+	    {
+		in2_port = changebit(in2_port, 1, !is_pressed);
+	    }
+	    break;
+	    default: break;
+	}
     }
 
     void BerrnShuriBoy::init_ram()
@@ -178,33 +209,6 @@ namespace berrn
 	}
 
 	return data;
-    }
-
-    void BerrnShuriBoy::stop_core()
-    {
-	tile_video->shutdown();
-	vblank_timer->stop();
-	irq_timer->stop();
-	main_rom.clear();
-	main_proc->shutdown();
-    }
-
-    void BerrnShuriBoy::run_core()
-    {
-	driver.run_scheduler();
-    }
-
-    void BerrnShuriBoy::key_changed(BerrnInput key, bool is_pressed)
-    {
-	switch (key)
-	{
-	    case BerrnInput::BerrnService:
-	    {
-		in2_port = changebit(in2_port, 1, !is_pressed);
-	    }
-	    break;
-	    default: break;
-	}
     }
 
     void BerrnShuriBoy::updatePixels()
@@ -338,12 +342,12 @@ namespace berrn
 	{
 	    if (is_irq_enabled && !testbit(data, 2))
 	    {
-		main_proc->clear_interrupt();
+		main_cpu->clearInterrupt();
 	    }
 
 	    if (is_nmi_enabled && !testbit(data, 0))
 	    {
-		main_proc->fire_nmi(false);
+		main_cpu->fireNMI(false);
 	    }
 
 	    is_irq_enabled = testbit(data, 2);

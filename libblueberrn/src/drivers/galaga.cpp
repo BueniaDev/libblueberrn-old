@@ -92,12 +92,9 @@ namespace berrn
 	main_inter = new GalagaInterface(driver, *this);
 	aux_inter = new GalagaInterface(driver, *this);
 	sound_inter = new GalagaInterface(driver, *this);
-	main_proc = new BerrnZ80Processor(3072000, *main_inter);
-	aux_proc = new BerrnZ80Processor(3072000, *aux_inter);
-	sound_proc = new BerrnZ80Processor(3072000, *sound_inter);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
-	aux_cpu = new BerrnCPU(scheduler, *aux_proc);
-	sound_cpu = new BerrnCPU(scheduler, *sound_proc);
+	main_cpu = new BerrnZ80CPU(driver, 3072000, *main_inter);
+	aux_cpu = new BerrnZ80CPU(driver, 3072000, *aux_inter);
+	sound_cpu = new BerrnZ80CPU(driver, 3072000, *sound_inter);
 
 	auto chip_select = [&](int addr, bool line) -> void
 	{
@@ -320,11 +317,11 @@ namespace berrn
 	auto &scheduler = driver.get_scheduler();
 	scheduler.set_quantum(time_in_hz(6000));
 	main_inter->init("maincpu");
-	main_proc->init();
+	main_cpu->init();
 	aux_inter->init("auxcpu");
-	aux_proc->init();
+	aux_cpu->init();
 	sound_inter->init("soundcpu");
-	sound_proc->init();
+	sound_cpu->init();
 	scheduler.add_device(main_cpu);
 	scheduler.add_device(aux_cpu);
 	scheduler.add_device(sound_cpu);
@@ -348,11 +345,11 @@ namespace berrn
     {
 	vblank_timer->stop();
 	video->shutdown();
-	sound_proc->shutdown();
+	sound_cpu->shutdown();
 	sound_inter->shutdown();
-	aux_proc->shutdown();
+	aux_cpu->shutdown();
 	aux_inter->shutdown();
-	main_proc->shutdown();
+	main_cpu->shutdown();
 	main_inter->shutdown();
     }
 

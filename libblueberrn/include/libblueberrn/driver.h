@@ -74,6 +74,7 @@ namespace berrn
 	BerrnDownP1,
 	BerrnButton1P1,
 	BerrnButton2P1,
+	BerrnButton3P1,
 	BerrnService,
 	BerrnDump,
     };
@@ -478,6 +479,8 @@ namespace berrn
 		    process_audio();
 		    output_audio();
 		});
+
+		random_seed = 0x9D14ABD7;
 	    }
 
 	    ~berrndriver()
@@ -549,6 +552,12 @@ namespace berrn
 		}
 
 		return front->getSampleRate();
+	    }
+
+	    uint32_t gen_rand()
+	    {
+		random_seed = 1664525 * random_seed + 1013904223;
+		return ((random_seed >> 16) | (random_seed << 16));
 	    }
 
 	    void add_mono_sample(int32_t sample, double gain = 1.0)
@@ -675,6 +684,8 @@ namespace berrn
 
 	    BerrnScheduler scheduler;
 	    BerrnTimer *mixer_timer = NULL;
+
+	    uint32_t random_seed = 0;
     };
 
     class LIBBLUEBERRN_API berrnaudiodevice

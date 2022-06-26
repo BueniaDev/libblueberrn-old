@@ -106,6 +106,8 @@ class SDL2Frontend : public BlueberrnFrontend
 	    is_xmas_time = is_xmas();
 	    init_config_file();
 
+	    // SDL_setenv("SDL_AUDIODRIVER", "disk", true);
+
 	    isdriverloaded = !core->nocmdarguments();
 	    if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
 	    {
@@ -404,7 +406,8 @@ class SDL2Frontend : public BlueberrnFrontend
 			// Down - P1 Down
 			// A - P1 Button 1
 			// B = P1 Button 2
-			// D = Dump (for debugging purposes)
+			// C = P1 Button 3
+			// Ctrl+D = Dump (for debugging purposes)
 			bool is_pressed = (event.type == SDL_KEYDOWN);
 
 			switch (event.key.keysym.sym)
@@ -418,7 +421,15 @@ class SDL2Frontend : public BlueberrnFrontend
 			    case SDLK_DOWN: core->keychanged(BerrnInput::BerrnDownP1, is_pressed); break;
 			    case SDLK_a: core->keychanged(BerrnInput::BerrnButton1P1, is_pressed); break;
 			    case SDLK_b: core->keychanged(BerrnInput::BerrnButton2P1, is_pressed); break;
-			    case SDLK_d: core->keychanged(BerrnInput::BerrnDump, is_pressed); break;
+			    case SDLK_c: core->keychanged(BerrnInput::BerrnButton3P1, is_pressed); break;
+			    case SDLK_d:
+			    {
+				if (isctrlpressed(event))
+				{
+				    core->keychanged(BerrnInput::BerrnDump, is_pressed);
+				}
+			    }
+			    break;
 			}
 		    }
 		    break;
@@ -864,6 +875,11 @@ class SDL2Frontend : public BlueberrnFrontend
 		SDL_QueueAudio(1, audiobuffer.data(), (4096 * sizeof(int16_t)));
 	    }
 	}
+
+	bool isctrlpressed(SDL_Event event)
+	{
+	    return (event.key.keysym.mod & KMOD_CTRL) ? true : false;
+	}
 		
 	SDL_Window *window = NULL;
 	SDL_Renderer *render = NULL;
@@ -872,6 +888,8 @@ class SDL2Frontend : public BlueberrnFrontend
 	SDL_Texture *texture = NULL;
 				
 	BlueberrnCore *core = NULL;
+
+	ofstream audio_file;
 
 	bool isdriverloaded = false;
 		

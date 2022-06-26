@@ -304,14 +304,13 @@ namespace berrn
 
 	main_inter = new RastanM68K(driver, *this);
 
-	main_proc = new BerrnM68KProcessor(8000000, *main_inter);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnM68KCPU(driver, 8000000, *main_inter);
 
 	tile_video = new rastanvideo(driver);
 
 	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
 	{
-	    main_proc->fire_interrupt_level(5);
+	    main_cpu->fireInterruptLevel(5);
 	    tile_video->updatePixels();
 	});
     }
@@ -326,7 +325,7 @@ namespace berrn
 	auto &scheduler = driver.get_scheduler();
 	scheduler.set_quantum(time_in_hz(600));
 	main_inter->init();
-	main_proc->init();
+	main_cpu->init();
 	tile_video->init();
 	scheduler.add_device(main_cpu);
 	vblank_timer->start(time_in_hz(60), true);
@@ -341,7 +340,7 @@ namespace berrn
 	vblank_timer->stop();
 	tile_video->shutdown();
 	main_inter->shutdown();
-	main_proc->shutdown();
+	main_cpu->shutdown();
     }
 
     void RastanCore::run_core()

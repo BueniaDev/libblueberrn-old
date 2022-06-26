@@ -97,6 +97,19 @@ namespace berrn
 
 	    return *this;
 	}
+
+	berrnRGBA &operator *(const float value)
+	{
+	    red = clamp<uint8_t>((red * value), 0, 255);
+	    green = clamp<uint8_t>((green * value), 0, 255);
+	    blue = clamp<uint8_t>((blue * value), 0, 255);
+	    return *this;
+	}
+
+	berrnRGBA &operator *=(const float value)
+	{
+	    return (*this * value);
+	}
     };
 	
     inline berrnRGBA red()

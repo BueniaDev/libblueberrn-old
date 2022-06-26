@@ -69,16 +69,13 @@ namespace berrn
 	    berrndriver &driver;
 
 	    GalagaInterface *main_inter = NULL;
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    GalagaInterface *aux_inter = NULL;
-	    BerrnZ80Processor *aux_proc = NULL;
-	    BerrnCPU *aux_cpu = NULL;
+	    BerrnZ80CPU *aux_cpu = NULL;
 
 	    GalagaInterface *sound_inter = NULL;
-	    BerrnZ80Processor *sound_proc = NULL;
-	    BerrnCPU *sound_cpu = NULL;
+	    BerrnZ80CPU *sound_cpu = NULL;
 
 	    namco06xx *n06xx = NULL;
 

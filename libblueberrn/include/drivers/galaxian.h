@@ -53,8 +53,7 @@ namespace berrn
 
 	    bool irq_enable = false;
 
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
 

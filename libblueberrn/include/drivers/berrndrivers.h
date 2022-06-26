@@ -31,10 +31,14 @@
 #include <1942.h>
 #include <1943.h>
 #include <tmnt.h>
+#include <mia.h>
+#include <punkshot.h>
 #include <xmen.h>
 #include <konmedal.h>
 #include <cave.h>
 #include <aliens.h>
+#include <blockhole.h>
 #include <bombjack.h>
+#include <gradius.h>
 
 #endif // BERRN_DRIVERS

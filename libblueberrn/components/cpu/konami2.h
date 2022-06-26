@@ -57,6 +57,11 @@ class BerrnKonami2Interface : public BotnamiInterface
 	    inter.writeCPU8(addr, data);
 	}
 
+	void setLines(uint8_t data)
+	{
+	    inter.portOut(0, data);
+	}
+
     private:
 	BerrnInterface &inter;
 };
@@ -116,8 +121,9 @@ class BerrnKonami2Processor : public BerrnProcessor
 		}
 		else
 		{
-		    // core.debugoutput();
-		    cycles_left -= core.executenextinstr();
+		    // debug_output();
+		    cycles_diff = core.executenextinstr();
+		    cycles_left -= cycles_diff;
 		}
 	    }
 	    while (cycles_left > 0);
@@ -138,6 +144,7 @@ class BerrnKonami2Processor : public BerrnProcessor
 	void debug_output()
 	{
 	    cout << "KONAMI-2 output: " << endl;
+	    cout << "Cycles: " << dec << cycles_diff << endl;
 	    core.debugoutput();
 	}
 
@@ -148,9 +155,40 @@ class BerrnKonami2Processor : public BerrnProcessor
 	BotnamiKonami2 core;
 	int64_t current_cycles = 0;
 	int64_t cycles_left = 0;
+	int64_t cycles_diff = 0;
 	bool is_stopped = true;
 	bool is_halted = false;
 	bool dump = false;
+};
+
+class BerrnKonami2CPU : public BerrnCPU
+{
+    public:
+	BerrnKonami2CPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new BerrnKonami2Processor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
 };
 
 #endif // LIBBLUEBERRN_KONAMI2_H

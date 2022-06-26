@@ -42,8 +42,7 @@ namespace berrn
     PacmanCore::PacmanCore(berrndriver &drv) : driver(drv)
     {
 	auto &scheduler = driver.get_scheduler();
-	main_proc = new BerrnZ80Processor(3072000, *this);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnZ80CPU(driver, 3072000, *this);
 
 	video = new pacmanvideo(driver);
 
@@ -51,7 +50,7 @@ namespace berrn
 	{
 	    if (is_irq_enabled)
 	    {
-		main_proc->fire_interrupt();
+		main_cpu->fireInterrupt();
 	    }
 
 	    video->updatePixels();
@@ -66,7 +65,7 @@ namespace berrn
     bool PacmanCore::init_core()
     {
 	auto &scheduler = driver.get_scheduler();
-	main_proc->init();
+	main_cpu->init();
 	scheduler.add_device(main_cpu);
 	vblank_timer->start(time_in_hz(60), true);
 	main_rom = driver.get_rom_region("maincpu");
@@ -80,7 +79,7 @@ namespace berrn
     {
 	vblank_timer->stop();
 	video->shutdown();
-	main_proc->shutdown();
+	main_cpu->shutdown();
 	main_rom.clear();
     }
 
@@ -158,7 +157,7 @@ namespace berrn
 
 	if (port == 0)
 	{
-	    main_proc->set_irq_vector(data);
+	    main_cpu->setIRQVector(data);
 	}
     }
 
@@ -225,7 +224,7 @@ namespace berrn
 
 		if (!line)
 		{
-		    main_proc->clear_interrupt();
+		    main_cpu->clearInterrupt();
 		}
 	    }
 	    break;

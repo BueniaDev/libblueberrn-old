@@ -28,3 +28,6 @@
 [submodule "libblueberrn/components/audio/fm/BeeNuked"]
 	path = libblueberrn/components/audio/fm/BeeNuked
 	url = https://github.com/BueniaDev/BeeNuked.git
+[submodule "libblueberrn/components/audio/pcm/BeePCM"]
+	path = libblueberrn/components/audio/pcm/BeePCM
+	url = https://github.com/BueniaDev/BeePCM.git

@@ -47,8 +47,7 @@ namespace berrn
 	private:
 	    berrndriver &driver;
 
-	    Berrn8080Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    Berrn8080CPU *main_cpu = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
 	    BerrnTimer *irq_timer = NULL;

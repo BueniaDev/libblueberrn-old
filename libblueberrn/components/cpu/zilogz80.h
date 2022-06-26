@@ -161,16 +161,6 @@ class BerrnZ80Processor : public BerrnProcessor
 		}
 		else
 		{
-		    if (dump == true)
-		    {
-			core.debugoutput();
-
-			if (core.pc == 0x3592)
-			{
-			    exit(0);
-			}
-		    }
-
 		    // core.debugoutput();
 		    cycles_left -= core.runinstruction();
 		}
@@ -219,6 +209,67 @@ class BerrnZ80Processor : public BerrnProcessor
 
 	uint8_t irq_opcode = 0;
 	bool is_irq_line = false;
+};
+
+class BerrnZ80CPU : public BerrnCPU
+{
+    public:
+	BerrnZ80CPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new BerrnZ80Processor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void setIRQVector(uint8_t opcode)
+	{
+	    get_processor().set_irq_vector(opcode);
+	}
+
+	void fireInterrupt(bool is_line = true)
+	{
+	    get_processor().fire_interrupt(is_line);
+	}
+
+	void fireInterrupt8(uint8_t opcode = 0xFF, bool is_line = true)
+	{
+	    get_processor().fire_interrupt8(opcode, is_line);
+	}
+
+	void clearInterrupt()
+	{
+	    get_processor().clear_interrupt();
+	}
+
+	void fireNMI(bool is_line = true)
+	{
+	    get_processor().fire_nmi(is_line);
+	}
+
+	void setPrescalers(int cycle_pres, int m1_pres)
+	{
+	    get_processor().set_prescalers(cycle_pres, m1_pres);
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
+	
 };
 
 #endif // LIBBLUEBERRN_Z80_H

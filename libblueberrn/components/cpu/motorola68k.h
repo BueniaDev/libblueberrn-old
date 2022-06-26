@@ -20,7 +20,7 @@
 #define LIBBLUEBERRN_M68K_H
 
 #include "m68k/Botsashi/Botsashi/botsashi.h"
-#include "scheduler.h"
+#include <driver.h>
 using namespace botsashi;
 using namespace berrn;
 
@@ -163,6 +163,42 @@ class BerrnM68KProcessor : public BerrnProcessor
 	bool is_halted = false;
 	bool dump = false;
 	int num_instrs = 0;
+};
+
+class BerrnM68KCPU : public BerrnCPU
+{
+    public:
+	BerrnM68KCPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new BerrnM68KProcessor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void fireInterruptLevel(int level, bool is_line = true)
+	{
+	    get_processor().fire_interrupt_level(level, is_line);
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
+	
 };
 
 #endif // LIBBLUEBERRN_M68K_H

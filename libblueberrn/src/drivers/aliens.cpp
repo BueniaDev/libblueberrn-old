@@ -42,6 +42,7 @@ namespace berrn
     void AliensMainInterface::init()
     {
 	main_rom = driver.get_rom_region("maincpu");
+	main_ram.fill(0);
     }
 
     void AliensMainInterface::shutdown()
@@ -57,6 +58,10 @@ namespace berrn
 	    uint32_t rom_addr = ((addr - 0x8000) + 0x28000);
 	    data = main_rom.at(rom_addr); 
 	}
+	else if (inRange(addr, 0x0400, 0x2000))
+	{
+	    data = main_ram.at(addr - 0x400);
+	}
 	else
 	{
 	    data = BerrnInterface::readCPU8(addr);
@@ -65,12 +70,40 @@ namespace berrn
 	return data;
     }
 
+    void AliensMainInterface::writeCPU8(uint16_t addr, uint8_t data)
+    {
+	if (inRange(addr, 0x8000, 0x10000))
+	{
+	    return;
+	}
+	else if (inRange(addr, 0x0400, 0x2000))
+	{
+	    main_ram.at(addr - 0x400) = data;
+	}
+	else if (addr == 0x5F88)
+	{
+	    cout << "Writing value of " << hex << int(data) << " to coin counter register" << endl;
+	    return;
+	}
+	else if (addr == 0x5F8C)
+	{
+	    cout << "Writing value of " << hex << int(data) << " to sound IRQ trigger register" << endl;
+	}
+	else if (inRange(addr, 0x4000, 0x8000))
+	{
+	    cout << "Writing value of " << hex << int(data) << " to K052109/K051960 address of " << hex << int(addr - 0x4000) << endl;
+	}
+	else
+	{
+	    BerrnInterface::writeCPU8(addr, data);
+	}
+    }
+
     AliensCore::AliensCore(berrndriver &drv) : driver(drv)
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter = new AliensMainInterface(driver, *this);
-	main_proc = new BerrnKonami2Processor(3000000, *main_inter);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnKonami2CPU(driver, 3000000, *main_inter);
     }
 
     AliensCore::~AliensCore()
@@ -82,14 +115,14 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter->init();
-	main_proc->init();
+	main_cpu->init();
 	scheduler.add_device(main_cpu);
 	return true;
     }
 
     void AliensCore::stop_core()
     {
-	main_proc->shutdown();
+	main_cpu->shutdown();
 	main_inter->shutdown();
     }
 

@@ -56,8 +56,7 @@ namespace berrn
 	    array<uint8_t, 0x400> main_ram;
 	    array<uint8_t, 0x400> temp_vram;
 
-	    Berrn6502Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    Berrn6502CPU *main_cpu = NULL;
 
 	    BerrnTimer *irq_timer = NULL;
 

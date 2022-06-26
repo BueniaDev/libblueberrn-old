@@ -21,8 +21,6 @@
 
 #include <libblueberrn_api.h>
 #include <driver.h>
-#include <iostream>
-#include <string>
 using namespace berrn;
 using namespace std;
 

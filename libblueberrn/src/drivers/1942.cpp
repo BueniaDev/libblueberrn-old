@@ -253,12 +253,10 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter = new Berrn1942Main(driver, *this);
-	main_proc = new BerrnZ80Processor(3000000, *main_inter);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnZ80CPU(driver, 3000000, *main_inter);
 
 	sound_inter = new Berrn1942Sound(driver, *this);
-	sound_proc = new BerrnZ80Processor(3000000, *sound_inter);
-	sound_cpu = new BerrnCPU(scheduler, *sound_proc);
+	sound_cpu = new BerrnZ80CPU(driver, 3000000, *sound_inter);
 
 	video = new berrn1942video(driver);
 
@@ -299,24 +297,24 @@ namespace berrn
     {
 	if (scanline == 0x2C)
 	{
-	    sound_proc->fire_interrupt8();
+	    sound_cpu->fireInterrupt8();
 	}
 
 	if (scanline == 0x6D)
 	{
-	    main_proc->fire_interrupt8(0xCF);
-	    sound_proc->fire_interrupt8();
+	    main_cpu->fireInterrupt8(0xCF);
+	    sound_cpu->fireInterrupt8();
 	}
 
 	if (scanline == 0xAF)
 	{
-	    sound_proc->fire_interrupt8();
+	    sound_cpu->fireInterrupt8();
 	}
 
 	if (scanline == 0xF0)
 	{
-	    main_proc->fire_interrupt8(0xD7);
-	    sound_proc->fire_interrupt8();
+	    main_cpu->fireInterrupt8(0xD7);
+	    sound_cpu->fireInterrupt8();
 	}
     }
 
@@ -464,13 +462,14 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter->init();
-	main_proc->init();
+	main_cpu->init();
 	sound_inter->init();
-	sound_proc->init();
+	sound_cpu->init();
 	video->init();
 	p1_port = 0xFF;
 	is_first_time = true;
 	irq_timer->start(0, false);
+	vblank_start_time = 0;
 	vblank_timer->start(time_until_pos(246), false);
 	scheduler.add_device(main_cpu);
 	scheduler.add_device(sound_cpu);
@@ -482,9 +481,9 @@ namespace berrn
 	irq_timer->stop();
 	vblank_timer->stop();
 	video->shutdown();
-	sound_proc->shutdown();
+	sound_cpu->shutdown();
 	sound_inter->shutdown();
-	main_proc->shutdown();
+	main_cpu->shutdown();
 	main_inter->shutdown();
     }
 

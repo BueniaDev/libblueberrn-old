@@ -153,4 +153,34 @@ class BerrnKonami1Processor : public BerrnProcessor
 	bool dump = false;
 };
 
+class BerrnKonami1CPU : public BerrnCPU
+{
+    public:
+	BerrnKonami1CPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new BerrnKonami1Processor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
+};
+
 #endif // LIBBLUEBERRN_KONAMI1_H

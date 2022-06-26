@@ -86,8 +86,7 @@ namespace berrn
 
 	protected:
 	    berrndriver &driver;
-	    BerrnM68KProcessor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnM68KCPU *main_cpu = NULL;
 	    CaveM68K &interface;
 
 	    void update_irq_state();

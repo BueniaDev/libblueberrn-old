@@ -59,8 +59,7 @@ namespace berrn
 	private:
 	    berrndriver &driver;
 
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    int64_t vblank_start_time = 0;
 

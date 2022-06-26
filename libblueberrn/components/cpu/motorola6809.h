@@ -153,4 +153,34 @@ class BerrnM6809Processor : public BerrnProcessor
 	bool dump = false;
 };
 
+class BerrnM6809CPU : public BerrnCPU
+{
+    public:
+	BerrnM6809CPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new BerrnM6809Processor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
+};
+
 #endif // LIBBLUEBERRN_M6809_H

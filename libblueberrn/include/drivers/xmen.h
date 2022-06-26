@@ -70,8 +70,7 @@ namespace berrn
 	    berrndriver &driver;
 
 	    XMenM68K *main_inter = NULL;
-	    BerrnM68KProcessor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnM68KCPU *main_cpu = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
 	    BerrnTimer *irq_timer = NULL;

@@ -40,8 +40,8 @@ namespace berrn
 	    void shutdown();
 
 	    void setRMRD(bool line);
-	    uint8_t tile_read(uint16_t addr);
-	    void tile_write(uint16_t addr, uint8_t data);
+	    uint16_t tile_read(bool upper, bool lower, uint32_t addr);
+	    void tile_write(bool upper, bool lower, uint32_t addr, uint16_t data);
 
 	    uint8_t sprite_read(uint16_t addr);
 	    void sprite_write(uint16_t addr, uint8_t data);
@@ -66,7 +66,15 @@ namespace berrn
 	    int frame_number = 0;
 	    int priority_flag = 0;
 
+	    vector<uint8_t> priority_rom;
+
 	    vector<uint8_t> obj_tiles;
+
+	    array<int, (512 * 256)> layer0;
+	    array<int, (512 * 256)> layer1;
+	    array<int, (512 * 256)> layer2;
+
+	    array<int, (512 * 256)> objlayer;
 
 	    BerrnBitmapRGB *bitmap = NULL;
 

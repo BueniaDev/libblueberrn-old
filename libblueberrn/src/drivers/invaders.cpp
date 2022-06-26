@@ -35,8 +35,7 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 
-	main_proc = new Berrn8080Processor(2000000, *this);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new Berrn8080CPU(driver, 2000000, *this);
 
 	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
 	{
@@ -46,7 +45,7 @@ namespace berrn
 	irq_timer = new BerrnTimer("IRQ", scheduler, [&](int64_t, int64_t)
 	{
 	    uint8_t interrupt_op = (is_end_of_frame) ? 0xD7 : 0xCF;
-	    main_proc->fire_interrupt8(interrupt_op);
+	    main_cpu->fireInterrupt8(interrupt_op);
 	    is_end_of_frame = !is_end_of_frame;
 	});
 
@@ -62,13 +61,12 @@ namespace berrn
     bool InvadersCore::initcore()
     {
 	port1 = 0x00;
-	main_proc->init();
 	rom = driver.get_rom_region("maincpu");
 	auto &scheduler = driver.get_scheduler();
 
 	main_ram.fill(0);
 	video_ram.fill(0);
-
+	main_cpu->init();
 	scheduler.add_device(main_cpu);
 	vblank_timer->start(time_in_hz(60), true);
 	irq_timer->start(time_in_hz(120), true);
@@ -81,7 +79,7 @@ namespace berrn
 	rom.clear();
 	vblank_timer->stop();
 	irq_timer->stop();
-	main_proc->shutdown();
+	main_cpu->shutdown();
     }
 
     void InvadersCore::runcore()

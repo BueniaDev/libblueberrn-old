@@ -19,11 +19,155 @@
 #include "1943.h"
 using namespace berrn;
 
+// 1943: The Battle of Midway (WIP)
+
 namespace berrn
 {
-    driver1943u::driver1943u()
+    berrn_rom_start(1943u)
+	berrn_rom_region("maincpu", 0x30000, 0)
+	    berrn_rom_load("bmu01c.12d", 0x00000, 0x08000)
+	    berrn_rom_load("bmu02c.13d", 0x10000, 0x10000)
+	    berrn_rom_load("bmu03c.14d", 0x20000, 0x10000)
+    berrn_rom_end
+
+    Berrn1943Main::Berrn1943Main(berrndriver &drv, Berrn1943Core &core) : driver(drv), main_core(core)
     {
 
+    }
+
+    Berrn1943Main::~Berrn1943Main()
+    {
+
+    }
+
+    void Berrn1943Main::init()
+    {
+	main_rom = driver.get_rom_region("maincpu");
+	main_ram.fill(0);
+    }
+
+    void Berrn1943Main::shutdown()
+    {
+	main_rom.clear();
+    }
+
+    uint8_t Berrn1943Main::readCPU8(uint16_t addr)
+    {
+	uint8_t data = 0;
+	if (addr < 0x8000)
+	{
+	    data = main_rom.at(addr);
+	}
+	else if (addr == 0xC000)
+	{
+	    // SYSTEM
+	    data = 0xFF;
+	}
+	else if (addr == 0xC003)
+	{
+	    // DSWA
+	    data = 0xF8;
+	}
+	else if (addr == 0xC004)
+	{
+	    // DSWB
+	    data = 0xFF;
+	}
+	else if (inRange(addr, 0xE000, 0xF000))
+	{
+	    data = main_ram.at(addr & 0xFFF);
+	}
+	else if (inRange(addr, 0xF000, 0x10000))
+	{
+	    data = sprite_ram.at(addr & 0xFFF);
+	}
+	else
+	{
+	    data = BerrnInterface::readCPU8(addr);
+	}
+
+	return data;
+    }
+
+    void Berrn1943Main::writeCPU8(uint16_t addr, uint8_t data)
+    {
+	if (addr < 0xC000)
+	{
+	    return;
+	}
+	else if (addr == 0xC804)
+	{
+	    current_rom_bank = ((data >> 2) & 0x7);
+
+	    string char_str = testbit(data, 7) ? "Enabling" : "Disabling";
+	    cout << char_str << " characters..." << endl;
+	}
+	else if (inRange(addr, 0xD000, 0xD400))
+	{
+	    video_ram.at(addr & 0x3FF) = data;
+	}
+	else if (inRange(addr, 0xD400, 0xD800))
+	{
+	    color_ram.at(addr & 0x3FF) = data;
+	}
+	else if (addr == 0xD806)
+	{
+	    string bg1_str = testbit(data, 4) ? "Enabling" : "Disabling";
+	    string bg2_str = testbit(data, 5) ? "Enabling" : "Disabling";
+	    string obj_str = testbit(data, 6) ? "Enabling" : "Disabling";
+
+	    cout << bg1_str << " background 1..." << endl;
+	    cout << bg2_str << " background 2..." << endl;
+	    cout << obj_str << " sprites..." << endl;
+	}
+	else if (inRange(addr, 0xE000, 0xF000))
+	{
+	    main_ram.at(addr & 0xFFF) = data;
+	}
+	else if (inRange(addr, 0xF000, 0x10000))
+	{
+	    sprite_ram.at(addr & 0xFFF) = data;
+	}
+	else
+	{
+	    BerrnInterface::writeCPU8(addr, data);
+	}
+    }
+
+    Berrn1943Core::Berrn1943Core(berrndriver &drv) : driver(drv)
+    {
+	main_inter = new Berrn1943Main(driver, *this);
+	main_cpu = new BerrnZ80CPU(driver, 6000000, *main_inter);
+    }
+
+    Berrn1943Core::~Berrn1943Core()
+    {
+
+    }
+
+    bool Berrn1943Core::init_core()
+    {
+	auto &scheduler = driver.get_scheduler();
+	main_inter->init();
+	main_cpu->init();
+	scheduler.add_device(main_cpu);
+	return true;
+    }
+
+    void Berrn1943Core::stop_core()
+    {
+	main_inter->shutdown();
+	main_cpu->shutdown();
+    }
+
+    void Berrn1943Core::run_core()
+    {
+	driver.run_scheduler();
+    }
+
+    driver1943u::driver1943u()
+    {
+	core = new Berrn1943Core(*this);
     }
 
     driver1943u::~driver1943u()
@@ -43,17 +187,22 @@ namespace berrn
 
     bool driver1943u::drvinit()
     {
-	return false;
+	if (!loadROM(berrn_rom_name(1943u)))
+	{
+	    return false;
+	}
+
+	return core->init_core();
     }
 
     void driver1943u::drvshutdown()
     {
-	return;
+	core->stop_core();
     }
   
     void driver1943u::drvrun()
     {
-	return;
+	core->run_core();
     }
 
     void driver1943u::keychanged(BerrnInput key, bool is_pressed)

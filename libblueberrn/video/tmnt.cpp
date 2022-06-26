@@ -51,15 +51,16 @@ namespace berrn
 
     void tmntvideo::init()
     {
-	auto tile_callback = [&](uint8_t tile_num, uint8_t color_attrib, int bank) -> uint32_t
+	auto tile_callback = [&](int, uint8_t tile_num, uint8_t color_attrib, int bank) -> uint32_t
 	{
 	    uint32_t tile_addr = tile_num;
 	    tile_addr |= (((color_attrib & 0x3) << 8) | ((color_attrib & 0x10) << 6) | ((color_attrib & 0xC) << 9) | (bank << 13));
 
-	    return tile_addr;
+	    uint8_t attrib_byte = (color_attrib & 0xE0);
+	    return tilemap->create_tilemap_addr(tile_addr, attrib_byte);
 	};
 
-	auto sprite_callback = [&](uint16_t &code, uint8_t &color_attrib, int &priority, int &shadow) -> void
+	auto sprite_callback = [&](uint16_t &code, uint8_t &color_attrib, uint8_t&, bool&) -> void
 	{
 	    code |= ((color_attrib & 0x10) << 9);
 	    color_attrib = (16 + (color_attrib & 0xF));
@@ -133,17 +134,21 @@ namespace berrn
 
 	gfxDecodeSet(tmnt_obj_layout, sprite_rom, obj_tiles);
 
+	priority_rom = driver.get_rom_region("priprom");
+
 	tilemap->setCallback(tile_callback);
 	tilemap->init();
 	tilemap->setROM(tile_rom);
 
 	spritemap->init();
+	spritemap->setROM(sprite_rom);
 	spritemap->setTiles(obj_tiles);
 	spritemap->setSpriteCallback(sprite_callback);
     }
 
     void tmntvideo::shutdown()
     {
+	priority_rom.clear();
 	obj_tiles.clear();
 	tilemap->shutdown();
 	spritemap->shutdown();
@@ -173,93 +178,90 @@ namespace berrn
 
     void tmntvideo::updatePixels()
     {
-	render_tile_layer(2, true);
+	layer0 = tilemap->render(0);
+	layer1 = tilemap->render(1);
+	layer2 = tilemap->render(2);
 
-	if (testbit(priority_flag, 0))
-	{
-	    updateSprites();
-	}
-
-	render_tile_layer(1, false);
-
-	if (!testbit(priority_flag, 0))
-	{
-	    updateSprites();
-	}
-
-	render_tile_layer(0, false);
-	driver.set_screen(bitmap);
-    }
-
-    void tmntvideo::updateSprites()
-    {
 	spritemap->render(0, 0);
-	auto obj_buffer = spritemap->getFramebuffer();
+	objlayer = spritemap->getFramebuffer();
 
-	// NOTE: These measurements match recordings taken from a real PCB
-	for (int xpos = 102; xpos < 422; xpos++)
+	for (int xpos = 0; xpos < 320; xpos++)
 	{
-	    for (int ypos = 16; ypos < 240; ypos++)
+	    for (int ypos = 0; ypos < 224; ypos++)
 	    {
-		size_t index = (xpos + (ypos * 512));
-		uint32_t sprite_buffer = obj_buffer.at(index);
-		int color_num = (sprite_buffer & 0xF);
-		int color_attrib = (sprite_buffer >> 4);
+		uint16_t prior_addr = 0;
+		// NOTE: These measurements match recordings taken from a real PCB
+		size_t bg_offs = ((96 + xpos) + ((16 + ypos) * 512));
+		size_t obj_offs = ((102 + xpos) + ((16 + ypos) * 512));
+		int bg0 = layer0.at(bg_offs);
+		int bg1 = layer1.at(bg_offs);
+		int bg2 = layer2.at(bg_offs);
+		int obj = objlayer.at(obj_offs);
 
-		if (color_num == 0)
+		int bg0_tilenum = (bg0 & 0xF);
+		int bg1_tilenum = (bg1 & 0xF);
+		int bg2_tilenum = (bg2 & 0xF);
+		int obj_tilenum = (obj & 0xF);
+
+		prior_addr = (priority_flag << 6);
+
+		prior_addr = changebit(prior_addr, 5, testbit(bg2, 7));
+		prior_addr = changebit(prior_addr, 4, testbit(obj, 20));
+		prior_addr = changebit(prior_addr, 3, (bg0_tilenum != 0));
+		prior_addr = changebit(prior_addr, 2, (obj_tilenum != 0));
+		prior_addr = changebit(prior_addr, 1, (bg2_tilenum != 0));
+		prior_addr = changebit(prior_addr, 0, (bg1_tilenum != 0));
+
+		int prior_value = priority_rom.at(prior_addr);
+
+		int priority = (prior_value & 0x3);
+
+		int palette_num = 0;
+
+		switch (priority)
 		{
-		    continue;
+		    case 0:
+		    {
+			palette_num = (0x200 | (((bg1 >> 5) & 0x7) << 4) | bg1_tilenum);
+		    }
+		    break;
+		    case 1:
+		    {
+			palette_num = (0x280 | (((bg2 >> 5) & 0x7) << 4) | bg2_tilenum);
+		    }
+		    break;
+		    case 2:
+		    {
+			palette_num = (0x100 | (obj & 0xFF));
+		    }
+		    break;
+		    case 3:
+		    {
+			palette_num = ((((bg0 >> 5) & 0x7) << 4) | bg0_tilenum);
+		    }
+		    break;
 		}
 
-		int palette_num = ((color_attrib * 16) + color_num);
-
-		bitmap->setPixel((xpos - 102), (ypos - 16), palette->getColor(palette_num));
+		bitmap->setPixel(xpos, ypos, palette->getColor(palette_num));
 	    }
 	}
+
+	driver.set_screen(bitmap);
     }
 
     void tmntvideo::spritedump()
     {
+
     }
 
-    void tmntvideo::render_tile_layer(int layer, bool is_opaque)
+    uint16_t tmntvideo::tile_read(bool upper, bool lower, uint32_t addr)
     {
-	array<int, 3> layer_colorbase = {0, 32, 40};
-	auto gfx_addr = tilemap->render(layer);
-
-	// NOTE: These measurements match recordings taken from a real PCB
-	for (int xpos = 96; xpos < 416; xpos++)
-	{
-	    for (int ypos = 16; ypos < 240; ypos++)
-	    {
-		uint32_t pixel_offs = (xpos + (ypos * 512));
-		uint32_t tile_addr = (gfx_addr.at(pixel_offs) & 0xFF);
-
-		int tile_num = (tile_addr & 0xF);
-
-		int color_base = layer_colorbase.at(layer);
-
-		int color_num = (color_base + ((tile_addr >> 5) & 0x7));
-
-		if (!is_opaque && (tile_num == 0))
-		{
-		    continue;
-		}
-
-		int palette_num = ((color_num * 16) + tile_num);
-		bitmap->setPixel((xpos - 96), (ypos - 16), palette->getColor(palette_num));
-	    }
-	}
+	return tilemap->read16(upper, lower, addr);
     }
 
-    uint8_t tmntvideo::tile_read(uint16_t addr)
+    void tmntvideo::tile_write(bool upper, bool lower, uint32_t addr, uint16_t data)
     {
-	return tilemap->read(addr);
-    }
-
-    void tmntvideo::tile_write(uint16_t addr, uint8_t data)
-    {
-	tilemap->write(addr, data);
+	tilemap->write16(upper, lower, addr, data);
     }
 
     uint8_t tmntvideo::sprite_read(uint16_t addr)
@@ -274,13 +276,13 @@ namespace berrn
 
     uint8_t tmntvideo::palette_read(uint32_t addr)
     {
-	addr &= 0x7FF;
+	addr = ((addr >> 1) & 0x7FF);
 	return palette->read8(addr);
     }
 
     void tmntvideo::palette_write(uint32_t addr, uint8_t data)
     {
-	addr &= 0x7FF;
+	addr = ((addr >> 1) & 0x7FF);
 	palette->write8(addr, data);
     }
 

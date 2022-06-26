@@ -4,6 +4,7 @@ add_subdirectory(konami/BeeKonami)
 set(INTERFACE_HEADERS
 	k052109.h
 	k051962.h
+	k053251.h
 	k007232.h)
 
 add_library(konami INTERFACE)

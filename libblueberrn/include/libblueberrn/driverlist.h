@@ -31,24 +31,30 @@ namespace berrn
     {
 	void init()
 	{
-	    DRIVER(example);
-	    DRIVER(invaders);
-	    DRIVER(galaxian);
-	    DRIVER(pacman);
-	    DRIVER(galaga);
-	    DRIVER(bosco);
-	    DRIVER(wboy2u);
-	    DRIVER(rastan); // WIP (relies on M68K emulation)
-	    DRIVER(centiped);
-	    DRIVER(1942);
+	    DRIVER(example); // Example driver
+	    DRIVER(invaders); // Playable, but no sound
+	    DRIVER(galaxian); // No sprites, input or sound
+	    DRIVER(pacman); // No input or sound
+	    DRIVER(galaga); // WIP (relies on several Namco custom chips)
+	    DRIVER(bosco); // WIP (relies on several Namco custom chips)
+	    DRIVER(wboy2u); // WIP (TODO: Implement graphics support)
+	    DRIVER(rastan); // WIP (TODO: Finish PC080SN implementation)
+	    DRIVER(centiped); // WIP (TODO: Implement Pokey core for libblueberrn)
+	    DRIVER(1942); // Missing a few inputs, but otherwise should be functional
 	    DRIVER(1943u); // WIP
-	    DRIVER(tmnt); // WIP (relies on M68K and K051960 emulation)
+	    DRIVER(tmnt); // Should be fully playable
+	    DRIVER(tmntu); // Should be fully playable
+	    DRIVER(tmht); // Should be fully playable
+	    DRIVER(mia); // Should be fully playable
+	    DRIVER(punkshot); // No input or sound
 	    DRIVER(xmen); // WIP (relies on M68K emulation)
 	    DRIVER(ddonpach); // WIP (relies on M68K emulation)
-	    DRIVER(shuriboy);
-	    DRIVER(mariorou);
+	    DRIVER(shuriboy); // No input or sound
+	    DRIVER(mariorou); // No input or sound
 	    DRIVER(aliens); // WIP (relies on KONAMI-2 emulation)
-	    DRIVER(bombjack); // WIP
+	    DRIVER(blockhl); // WIP (relies on KONAMI-2 emulation)
+	    DRIVER(bombjack); // Missing inputs
+	    DRIVER(gradius); // WIP
 	}
     };
 };

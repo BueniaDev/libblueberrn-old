@@ -214,8 +214,7 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter = new XMenM68K(driver, *this);
-	main_proc = new BerrnM68KProcessor(16000000, *main_inter);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnM68KCPU(driver, 16000000, *main_inter);
 
 	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
 	{
@@ -226,7 +225,7 @@ namespace berrn
 	{
 	    if (current_scanline == 0)
 	    {
-		main_proc->fire_interrupt_level(5);
+		main_cpu->fireInterruptLevel(5);
 	    }
 
 	    if ((current_scanline == 240) && is_vblank_irq)
@@ -255,7 +254,7 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 	main_inter->init();
-	main_proc->init();
+	main_cpu->init();
 
 	vblank_timer->start(time_in_hz(59.17), true);
 	irq_timer->start((time_in_hz(59.17) / 256), true);
@@ -267,7 +266,7 @@ namespace berrn
 
     void XMenCore::stop_core()
     {
-	main_proc->shutdown();
+	main_cpu->shutdown();
 	main_inter->shutdown();
 	vblank_timer->stop();
 	irq_timer->stop();

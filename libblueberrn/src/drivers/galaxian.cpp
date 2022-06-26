@@ -39,8 +39,7 @@ namespace berrn
     {
 	auto &scheduler = driver.get_scheduler();
 
-	main_proc = new BerrnZ80Processor(3072000, *this);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnZ80CPU(driver, 3072000, *this);
 
 	video = new galaxianvideo(driver);
 
@@ -48,7 +47,7 @@ namespace berrn
 	{
 	    if (irq_enable)
 	    {
-		main_proc->fire_nmi(true);
+		main_cpu->fireNMI();
 	    }
 
 	    video->updatePixels();
@@ -62,7 +61,7 @@ namespace berrn
 
     bool GalaxianCore::initcore()
     {
-	main_proc->init();
+	main_cpu->init();
 	main_rom = driver.get_rom_region("maincpu");
 	main_ram.fill(0);
 
@@ -80,7 +79,7 @@ namespace berrn
 	vblank_timer->stop();
 	video->shutdown();
 	main_rom.clear();
-	main_proc->shutdown();
+	main_cpu->shutdown();
     }
 
     void GalaxianCore::runcore()
@@ -192,7 +191,7 @@ namespace berrn
 
 		if (!irq_enable)
 		{
-		    main_proc->fire_nmi(false);
+		    main_cpu->fireNMI(false);
 		}
 	    }
 	    break;

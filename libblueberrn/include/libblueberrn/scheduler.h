@@ -58,6 +58,18 @@ namespace berrn
 	return (msec * 1000);
     }
 
+    inline int64_t time_in_ticks(int ticks, uint32_t freq)
+    {
+	if (freq > 0)
+	{
+	    return (ticks * time_in_hz(freq));
+	}
+	else
+	{
+	    return time_zero();
+	}
+    }
+
     class BerrnScheduler;
     class BerrnTimer;
     using timerfunc = function<void(int64_t, int64_t)>;
@@ -174,6 +186,19 @@ namespace berrn
 	    virtual void halt(bool is_halting)
 	    {
 		(void)is_halting;
+		return;
+	    }
+
+	    virtual void set_irq_vector(uint8_t opcode)
+	    {
+		(void)opcode;
+		return;
+	    }
+
+	    virtual void set_prescalers(int cycle_pres, int fetch_pres)
+	    {
+		(void)cycle_pres;
+		(void)fetch_pres;
 		return;
 	    }
 
@@ -455,6 +480,11 @@ namespace berrn
 	    BerrnCPU(BerrnScheduler &sched, BerrnProcessor &proc) : scheduler(sched), processor(proc)
 	    {
 		current_time = 0;
+	    }
+
+	    BerrnCPU(BerrnScheduler &sched, BerrnProcessor *proc) : BerrnCPU(sched, *proc)
+	    {
+
 	    }
 
 	    virtual ~BerrnCPU()

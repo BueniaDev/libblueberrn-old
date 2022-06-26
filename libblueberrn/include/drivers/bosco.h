@@ -68,8 +68,7 @@ namespace berrn
 	    berrndriver &driver;
 
 	    BoscoInterface *main_inter = NULL;
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    namco06xx *n06xx_0 = NULL;
 	    namco06xx *n06xx_1 = NULL;

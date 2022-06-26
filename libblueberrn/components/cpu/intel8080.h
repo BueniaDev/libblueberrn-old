@@ -141,4 +141,44 @@ class Berrn8080Processor : public BerrnProcessor
 	bool is_stopped = true;
 };
 
+class Berrn8080CPU : public BerrnCPU
+{
+    public:
+	Berrn8080CPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new Berrn8080Processor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void fireInterrupt8(uint8_t opcode = 0xFF, bool is_line = true)
+	{
+	    get_processor().fire_interrupt8(opcode, is_line);
+	}
+
+	void clearInterrupt()
+	{
+	    get_processor().clear_interrupt();
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
+};
+
 #endif // LIBBLUEBERRN_8080_H

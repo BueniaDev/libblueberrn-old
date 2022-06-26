@@ -37,7 +37,7 @@ namespace berrn
 
     void shuriboyvideo::init()
     {
-	auto tile_callback = [&](uint8_t tile_num, uint8_t color_attrib, int bank) -> uint32_t
+	auto tile_callback = [&](int layer, uint8_t tile_num, uint8_t color_attrib, int bank) -> uint32_t
 	{
 	    uint32_t tile_addr = tile_num;
 	    tile_addr |= (((color_attrib & 0xC) << 6) | (bank << 10));
@@ -47,7 +47,20 @@ namespace berrn
 		tile_addr = setbit(tile_addr, 12);
 	    }
 
-	    return tile_addr;
+	    bool is_flipx = testbit(color_attrib, 0);
+
+	    uint8_t attrib_byte = color_attrib;
+
+	    if (layer == 1)
+	    {
+		attrib_byte = changebit(attrib_byte, 2, is_flipx);
+	    }
+	    else
+	    {
+		attrib_byte = changebit(attrib_byte, 0, is_flipx);
+	    }
+
+	    return tilemap->create_tilemap_addr(tile_addr, attrib_byte);
 	};
 
 	initLayerOrder();

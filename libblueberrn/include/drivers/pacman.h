@@ -45,8 +45,9 @@ namespace berrn
 	private:
 	    berrndriver &driver;
 
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    // BerrnZ80Processor *main_proc = NULL;
+	    // BerrnCPU *main_cpu = NULL;
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    void writeLatch(int addr, bool line);
 

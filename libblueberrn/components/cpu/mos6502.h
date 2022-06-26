@@ -152,4 +152,39 @@ class Berrn6502Processor : public BerrnProcessor
 	bool is_irq_line = false;
 };
 
+class Berrn6502CPU : public BerrnCPU
+{
+    public:
+	Berrn6502CPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new Berrn6502Processor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void fireInterrupt(bool is_line = true)
+	{
+	    get_processor().fire_interrupt(is_line);
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
+};
+
 #endif // LIBBLUEBERRN_M6502_H

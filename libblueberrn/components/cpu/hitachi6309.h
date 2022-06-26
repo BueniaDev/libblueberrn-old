@@ -153,4 +153,34 @@ class BerrnHD6309Processor : public BerrnProcessor
 	bool dump = false;
 };
 
+class BerrnHD6309CPU : public BerrnCPU
+{
+    public:
+	BerrnHD6309CPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new BerrnHD6309Processor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
+};
+
 #endif // LIBBLUEBERRN_HD6309_H

@@ -313,8 +313,7 @@ namespace berrn
     CaveCore::CaveCore(berrndriver &drv, CaveM68K &inter) : driver(drv), interface(inter)
     {
 	auto &scheduler = driver.get_scheduler();
-	main_proc = new BerrnM68KProcessor(16000000, inter);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	main_cpu = new BerrnM68KCPU(driver, 16000000, inter);
 
 	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t param, int64_t)
 	{
@@ -340,15 +339,16 @@ namespace berrn
 
     void CaveCore::init_base(int time_irq)
     {
-	interface.init();
 	auto &scheduler = driver.get_scheduler();
+	interface.init();
+	main_cpu->init();
 	scheduler.add_device(main_cpu);
-	main_proc->init();
 	vblank_timer->start(17376, true, time_irq);
     }
 
     void CaveCore::stop_base()
     {
+	main_cpu->shutdown();
 	vblank_timer->stop();
     }
 
@@ -374,14 +374,7 @@ namespace berrn
 
     void CaveCore::update_irq_state()
     {
-	if (is_vblank_irq)
-	{
-	    main_proc->fire_interrupt_level(1, true);
-	}
-	else
-	{
-	    main_proc->fire_interrupt_level(1, false);
-	}
+	main_cpu->fireInterruptLevel(1, is_vblank_irq);
     }
 
     void CaveCore::vblank_start()

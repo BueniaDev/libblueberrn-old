@@ -121,12 +121,10 @@ namespace berrn
 	    bool is_first_time = false;
 
 	    Berrn1942Main *main_inter = NULL;
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    Berrn1942Sound *sound_inter = NULL;
-	    BerrnZ80Processor *sound_proc = NULL;
-	    BerrnCPU *sound_cpu = NULL;
+	    BerrnZ80CPU *sound_cpu = NULL;
 
 	    uint8_t sound_cmd = 0;
     };
