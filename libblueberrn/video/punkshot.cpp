@@ -59,7 +59,7 @@ namespace berrn
 	    return tilemap->create_tilemap_addr(tile_addr, attrib_byte);
 	};
 
-	auto sprite_callback = [&](uint16_t &code, uint8_t &color_attrib, uint8_t &priority, bool&) -> void
+	auto sprite_callback = [&](uint16_t &code, uint16_t &color_attrib, uint8_t &priority, bool&) -> void
 	{
 	    priority = (0x20 | ((color_attrib & 0x60) >> 2));
 	    code |= ((color_attrib & 0x10) << 9);
@@ -69,7 +69,7 @@ namespace berrn
 	auto tile_rom = driver.get_rom_region("k052109");
 	auto sprite_rom = driver.get_rom_region("k051960");
 
-	gfxDecodeSet(punkshot_obj_layout, sprite_rom, obj_tiles);
+	// gfxDecodeSet(punkshot_obj_layout, sprite_rom, obj_tiles);
 
 	tilemap->setCallback(tile_callback);
 	tilemap->init();
@@ -77,7 +77,7 @@ namespace berrn
 
 	spritemap->init();
 	spritemap->setROM(sprite_rom);
-	spritemap->setTiles(obj_tiles);
+	// spritemap->setTiles(obj_tiles);
 	spritemap->setSpriteCallback(sprite_callback);
 	priormap->init();
     }
@@ -167,7 +167,7 @@ namespace berrn
 	}
 
 
-	driver.set_screen(bitmap);
+	driver.set_screen_bmp(bitmap);
     }
 
     void punkshotvideo::setRMRD(bool line)

@@ -119,7 +119,7 @@ namespace berrn
 	updateBackground();
 	updateForeground();
 	updateSprites();
-	driver.set_screen(bitmap);
+	driver.set_screen_bmp(bitmap);
     }
 
     void bombjackvideo::updateBackground()

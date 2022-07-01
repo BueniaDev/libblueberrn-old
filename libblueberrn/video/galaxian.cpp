@@ -59,8 +59,8 @@ namespace berrn
     {
 	pal_rom = driver.get_rom_region("pal");
 	tile_rom = driver.get_rom_region("gfx");
-	tile_ram.resize((256 * 8 * 8 * 2), 0);
 	gfxDecodeSet(char_layout, tile_rom, tile_ram);
+	gfxDecodeSet(sprite_layout, tile_rom, sprite_ram);
 	video_ram.fill(0);
 	obj_ram.fill(0);
 	init_starfield();
@@ -245,7 +245,33 @@ namespace berrn
 	    }
 	}
 
-	driver.set_screen(bitmap);
+	for (int sprite = 7; sprite >= 0; sprite--)
+	{
+	    uint32_t sprite_offs = (0x40 + (sprite * 4));
+	    int xpos = (obj_ram.at(sprite_offs + 3) + 1);
+	    int ypos = (240 - obj_ram.at(sprite_offs));
+
+	    if (xpos < 8)
+	    {
+		continue;
+	    }
+
+	    uint8_t flip_attrib = obj_ram.at(sprite_offs + 1);
+
+	    if (sprite <= 2)
+	    {
+		ypos += 1;
+	    }
+
+	    bool is_flipy = testbit(flip_attrib, 7);
+	    bool is_flipx = testbit(flip_attrib, 6);
+
+	    uint8_t sprite_num = (flip_attrib & 0x3F);
+	    int color = (obj_ram.at(sprite_offs + 2) & 0x7);
+	    draw_sprite(sprite_num, xpos, ypos, is_flipx, is_flipy, color);
+	}
+
+	driver.set_screen_bmp(bitmap);
     }
 
     void galaxianvideo::draw_tile(uint32_t tile_num, int xcoord, int ycoord, int pal_num, int scroll)
@@ -276,6 +302,40 @@ namespace berrn
 	    }
 
 	    uint8_t color = pal_rom.at((color_offs * 4) + tile_color);
+	    set_pixel(xpos, ypos, color);
+	}
+    }
+
+    void galaxianvideo::draw_sprite(uint8_t sprite_num, int xcoord, int ycoord, bool flip_x, bool flip_y, int pal_num)
+    {
+	if (!inRange(xcoord, 0, 256) || !inRange(ycoord, 0, 224))
+	{
+	    return;
+	}
+
+	int color_offs = (pal_num & 0x7);
+
+	for (int pixel = 0; pixel < 256; pixel++)
+	{
+	    int py = (pixel / 16);
+	    int px = (pixel % 16);
+
+	    uint8_t sprite_color = sprite_ram.at((sprite_num * 256) + pixel);
+
+	    if (flip_x)
+	    {
+		px = (15 - px);
+	    }
+
+	    if (flip_y)
+	    {
+		py = (15 - py);
+	    }
+
+	    int xpos = (xcoord + px);
+	    int ypos = (ycoord + py);
+
+	    uint8_t color = pal_rom.at((color_offs * 4) + sprite_color);
 	    set_pixel(xpos, ypos, color);
 	}
     }

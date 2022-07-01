@@ -71,6 +71,7 @@ namespace berrn
 	    bool is_starfield_enabled = false;
 
 	    void draw_tile(uint32_t tile_num, int xcoord, int ycoord, int pal_num, int scroll);
+	    void draw_sprite(uint8_t sprite_num, int xcoord, int ycoord, bool flip_x, bool flip_y, int pal_num);
 	    void set_pixel(int xpos, int ypos, uint8_t color);
 
 	    array<uint8_t, 0x400> video_ram;
@@ -80,6 +81,7 @@ namespace berrn
 	    vector<uint8_t> tile_rom;
 
 	    vector<uint8_t> tile_ram;
+	    vector<uint8_t> sprite_ram;
     };
 };
 

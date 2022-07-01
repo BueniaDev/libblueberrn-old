@@ -29,7 +29,7 @@ namespace berrn
 	    berrn_rom_load("875_j02.e24", 0x20000, 0x10000)
     berrn_rom_end
 
-    AliensMainInterface::AliensMainInterface(berrndriver &drv, AliensCore &cb) : driver(drv), core(cb)
+    AliensMainInterface::AliensMainInterface(berrndriver &drv, AliensCore &core) : driver(drv), main_core(core)
     {
 
     }
@@ -58,9 +58,18 @@ namespace berrn
 	    uint32_t rom_addr = ((addr - 0x8000) + 0x28000);
 	    data = main_rom.at(rom_addr); 
 	}
+	else if (inRange(addr, 0x0000, 0x0400))
+	{
+	    data = main_core.readBank0000(addr);
+	}
 	else if (inRange(addr, 0x0400, 0x2000))
 	{
 	    data = main_ram.at(addr - 0x400);
+	}
+	else if (addr == 0x5F88)
+	{
+	    // Watchdog timer (unimplemented)
+	    data = 0x00;
 	}
 	else
 	{
@@ -76,14 +85,17 @@ namespace berrn
 	{
 	    return;
 	}
+	else if (inRange(addr, 0x0000, 0x0400))
+	{
+	    main_core.writeBank0000(addr, data);
+	}
 	else if (inRange(addr, 0x0400, 0x2000))
 	{
 	    main_ram.at(addr - 0x400) = data;
 	}
 	else if (addr == 0x5F88)
 	{
-	    cout << "Writing value of " << hex << int(data) << " to coin counter register" << endl;
-	    return;
+	    main_core.writeCoinCounter(data);
 	}
 	else if (addr == 0x5F8C)
 	{
@@ -117,6 +129,9 @@ namespace berrn
 	main_inter->init();
 	main_cpu->init();
 	scheduler.add_device(main_cpu);
+	palette_ram.fill(0);
+	bank_0000_ram.fill(0);
+	is_bank_0000_ram = false;
 	return true;
     }
 
@@ -129,6 +144,44 @@ namespace berrn
     void AliensCore::run_core()
     {
 	driver.run_scheduler();
+    }
+
+    uint8_t AliensCore::readBank0000(uint16_t addr)
+    {
+	uint8_t data = 0;
+	addr &= 0x3FF;
+
+	if (is_bank_0000_ram)
+	{
+	    data = bank_0000_ram.at(addr);
+	}
+	else
+	{
+	    data = palette_ram.at(addr);
+	}
+
+	return data;
+    }
+
+    void AliensCore::writeBank0000(uint16_t addr, uint8_t data)
+    {
+	addr &= 0x3FF;
+
+	if (is_bank_0000_ram)
+	{
+	    bank_0000_ram.at(addr) = data;
+	}
+	else
+	{
+	    palette_ram.at(addr) = data;
+	}
+    }
+
+    void AliensCore::writeCoinCounter(uint8_t data)
+    {
+	string rmrd_line = testbit(data, 6) ? "Asserting" : "Clearing";
+	is_bank_0000_ram = testbit(data, 5);
+	cout << rmrd_line << " K052109 RMRD line..." << endl;
     }
 
     driveraliens::driveraliens()

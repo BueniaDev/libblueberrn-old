@@ -58,18 +58,6 @@ namespace berrn
 	    void writeIO(int port, uint8_t data)
 	    {
 		audio_core.writeIO(port, data);
-
-		if (port == 0)
-		{
-		    opm_reg = data;
-		}
-		else if (port == 1)
-		{
-		    if ((opm_reg != 0x12) && (opm_reg != 0x14))
-		    {
-			cout << "Writing value of " << hex << int(data) << " to YM2151 register of " << hex << int(opm_reg) << endl;
-		    }
-		}
 	    }
 
 	    void clock_chip()

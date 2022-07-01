@@ -28,6 +28,7 @@ using namespace std::placeholders;
 
 namespace berrn
 {
+    using berrncbline = function<void(bool)>;
     using berrncbread8 = function<uint8_t(int)>;
     using berrncbwrite8 = function<void(int, uint8_t)>;
 

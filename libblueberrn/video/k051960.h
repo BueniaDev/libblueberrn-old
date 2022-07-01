@@ -29,7 +29,15 @@ using namespace std;
 namespace berrn
 {
     using objbuffer = array<int, (512 * 256)>;
-    using k051960callback = function<void(uint16_t&, uint8_t&, uint8_t&, bool&)>;
+    using k051960callback = function<void(uint16_t&, uint16_t&, uint8_t&, bool&)>;
+
+    enum K051960Layout : int
+    {
+	Base = 0,
+	MIA = 1,
+	Gradius3 = 2,
+    };
+
     class k051960video
     {
 	public:
@@ -38,7 +46,7 @@ namespace berrn
 
 	    void init();
 	    void setROM(vector<uint8_t> &rom);
-	    void setTiles(vector<uint8_t> &tiles);
+	    void setLayout(K051960Layout layout);
 	    void setSpriteCallback(k051960callback cb);
 	    void shutdown();
 
@@ -51,6 +59,8 @@ namespace berrn
 	private:
 	    berrndriver &driver;
 
+	    BerrnGfxLayout gfx_layout;
+
 	    vector<uint8_t> obj_rom;
 	    vector<uint8_t> obj_tiles;
 
@@ -58,7 +68,7 @@ namespace berrn
 
 	    bool is_rmrd = false;
 
-	    array<uint8_t, 4> sprite_rom_bank;
+	    array<uint16_t, 4> sprite_rom_bank;
 
 	    uint8_t fetchROMData(int offs);
 

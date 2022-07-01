@@ -69,7 +69,7 @@ namespace berrn
     void driverexample::drvrun()
     {
 	run_scheduler();
-	set_screen(bitmap);
+	set_screen_bmp(bitmap);
     }
 
     void driverexample::keychanged(BerrnInput key, bool is_pressed)

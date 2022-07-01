@@ -29,57 +29,55 @@ namespace berrn
     class wsg3device : public berrnaudiodevice
     {
 	public:
-	    wsg3device(berrndriver &drv) : driver(drv)
+	    wsg3device(berrndriver &drv) : berrnaudiodevice(drv), driver(drv)
 	    {
 
 	    }
 
-	    void init(string tag = "namco")
+	    void init_device()
 	    {
-		cout << "Fetching wave ROM with tag of " << tag << endl;
+		waveROM = driver.get_rom_region("namco");
+		audio_core.init(waveROM);
+		audio_core.set_num_voices(3);
 	    }
 
 	    void shutdown()
 	    {
-		return;
+		audio_core.shutdown();
 	    }
 
 	    void write_reg(int addr, uint8_t data)
 	    {
-		cout << "Writing value of " << hex << int(data) << " to Namco WSG3 address of " << hex << int(addr) << endl;
+		audio_core.write_wsg3(addr, data);
 	    }
 
 	    void set_sound_enabled(bool is_enabled)
 	    {
-		if (is_enabled)
-		{
-		    cout << "Sound enabled" << endl;
-		}
-		else
-		{
-		    cout << "Sound disabled" << endl;
-		}
+		audio_core.set_sound_enabled(is_enabled);
 	    }
 
 	    uint32_t get_clock_rate(uint32_t clk_rate)
 	    {
-		return clk_rate;
+		return audio_core.get_sample_rate(clk_rate);
 	    }
 
 	    void clock_chip()
 	    {
-		return;
+		audio_core.clockchip();
 	    }
 
 	    vector<int32_t> get_samples()
 	    {
 		vector<int32_t> samples;
-		samples.push_back(0);
+		samples.push_back(audio_core.get_sample());
 		return samples;
 	    }
 
 	private:
+	    wsgaudio audio_core;
+
 	    berrndriver &driver;
+	    vector<uint8_t> waveROM;
     };
 };
 

@@ -22,17 +22,6 @@ using namespace std;
 
 namespace berrn
 {
-    static BerrnGfxLayout tmnt_obj_layout = 
-    {
-	16, 16,
-	16384,
-	4,
-	{24, 16, 8, 0},
-	{gfx_step8(0, 1), gfx_step8(256, 1)},
-	{gfx_step8(0, 32), gfx_step8(512, 32)},
-	128*8
-    };
-
     tmntvideo::tmntvideo(berrndriver &drv) : driver(drv)
     {
 	bitmap = new BerrnBitmapRGB(320, 224);
@@ -60,7 +49,7 @@ namespace berrn
 	    return tilemap->create_tilemap_addr(tile_addr, attrib_byte);
 	};
 
-	auto sprite_callback = [&](uint16_t &code, uint8_t &color_attrib, uint8_t&, bool&) -> void
+	auto sprite_callback = [&](uint16_t &code, uint16_t &color_attrib, uint8_t&, bool&) -> void
 	{
 	    code |= ((color_attrib & 0x10) << 9);
 	    color_attrib = (16 + (color_attrib & 0xF));
@@ -132,8 +121,6 @@ namespace berrn
 	    sprite_rom[addr + 3] = uint8_t(rom_data >> 24);
 	}
 
-	gfxDecodeSet(tmnt_obj_layout, sprite_rom, obj_tiles);
-
 	priority_rom = driver.get_rom_region("priprom");
 
 	tilemap->setCallback(tile_callback);
@@ -142,7 +129,7 @@ namespace berrn
 
 	spritemap->init();
 	spritemap->setROM(sprite_rom);
-	spritemap->setTiles(obj_tiles);
+	spritemap->setLayout(K051960Layout::MIA);
 	spritemap->setSpriteCallback(sprite_callback);
     }
 
@@ -246,7 +233,7 @@ namespace berrn
 	    }
 	}
 
-	driver.set_screen(bitmap);
+	driver.set_screen_bmp(bitmap);
     }
 
     void tmntvideo::spritedump()

@@ -470,6 +470,157 @@ namespace berrn
 	    array<int32_t, 2> mixed_samples = {0, 0};
     };
 
+    class LIBBLUEBERRN_API berrnscreen
+    {
+	public:
+	    berrnscreen(BerrnScheduler &sched) : scheduler(sched)
+	    {
+		vblank_begin_timer = new BerrnTimer("VBlankBegin", scheduler, [&](int64_t, int64_t)
+		{
+		    vblank_begin();
+		});
+
+		vblank_end_timer = new BerrnTimer("VBlankEnd", scheduler, [&](int64_t, int64_t)
+		{
+		    vblank_end();
+		});
+	    }
+
+	    ~berrnscreen()
+	    {
+
+	    }
+
+	    int get_height() const
+	    {
+		return height;
+	    }
+
+	    int vpos()
+	    {
+		int64_t delta = (scheduler.get_current_time() - vblank_start_time);
+
+		int vpos = (delta / scan_time);
+
+		return ((max_y + 1 + vpos) % height);
+	    }
+
+	    int64_t time_until_pos(int vpos)
+	    {
+		vpos += (height - (max_y + 1));
+		vpos %= height;
+
+		int64_t target_delta = (vpos * scan_time);
+
+		int64_t current_delta = (scheduler.get_current_time() - vblank_start_time);
+
+		while (target_delta <= current_delta)
+		{
+		    target_delta += refresh_period;
+		}
+
+		return (target_delta - current_delta);
+	    }
+
+	    bool is_vblank()
+	    {
+		return (scheduler.get_current_time() < vblank_end_time);
+	    }
+
+	    void set_vblank_callback(berrncbline cb)
+	    {
+		vblank_callback = cb;
+	    }
+
+	    void set_raw(uint32_t pix_clock, uint16_t htotal, uint16_t hbend, uint16_t hbstart, uint16_t vtotal, uint16_t vbend, uint16_t vbstart)
+	    {
+		refresh_period = ((1e6 / pix_clock) * htotal * vtotal);
+		vblank_period = double(refresh_period) / vtotal * (vtotal - (vbstart - vbend));
+
+		width = htotal;
+		height = vtotal;
+
+		min_x = hbend;
+		max_x = (hbstart) ? (hbstart - 1) : (htotal - 1);
+		min_y = vbend;
+		max_y = (vbstart - 1);
+
+		scan_time = (refresh_period / height);
+	    }
+
+	    void init()
+	    {
+		vblank_begin_timer->start(time_until_vblank_start(), false);
+	    }
+
+	    void shutdown()
+	    {
+		vblank_begin_timer->stop();
+		vblank_end_timer->stop();
+	    }
+
+	private:
+	    BerrnScheduler &scheduler;
+
+	    BerrnTimer *vblank_begin_timer = NULL;
+	    BerrnTimer *vblank_end_timer = NULL;
+
+	    int64_t refresh_period = 0;
+	    int64_t vblank_period = 0;
+	    int width = 0;
+	    int height = 0;
+
+	    int min_x = 0;
+	    int max_x = 0;
+	    int min_y = 0;
+	    int max_y = 0;
+
+	    int64_t scan_time = 0;
+	    int64_t vblank_start_time = 0;
+	    int64_t vblank_end_time = 0;
+
+	    berrncbline vblank_callback;
+
+	    void vblank_begin()
+	    {
+		vblank_start_time = scheduler.get_current_time();
+		vblank_end_time = (vblank_start_time + vblank_period);
+
+		if (vblank_callback)
+		{
+		    vblank_callback(true);
+		}
+
+		vblank_begin_timer->start(time_until_vblank_start(), false);
+		vblank_end_timer->start(time_until_vblank_end(), false);
+	    }
+
+	    void vblank_end()
+	    {
+		if (vblank_callback)
+		{
+		    vblank_callback(false);
+		}
+	    }
+
+	    int64_t time_until_vblank_start()
+	    {
+		return time_until_pos(max_y + 1);
+	    }
+
+	    int64_t time_until_vblank_end()
+	    {
+		int64_t target_time = vblank_end_time;
+
+		if (!is_vblank())
+		{
+		    target_time += refresh_period;
+		}
+
+		return (target_time - scheduler.get_current_time());
+	    }
+    };
+
     class LIBBLUEBERRN_API berrndriver
     {
 	public:
@@ -481,6 +632,8 @@ namespace berrn
 		});
 
 		random_seed = 0x9D14ABD7;
+
+		screen = new berrnscreen(scheduler);
 	    }
 
 	    ~berrndriver()
@@ -524,23 +677,28 @@ namespace berrn
 		}
 	    }
 
-	    BerrnBitmap *get_screen()
+	    berrnscreen *get_screen()
 	    {
 		return screen;
 	    }
 
-	    void set_screen(BerrnBitmap *bitmap)
+	    BerrnBitmap *get_screen_bmp()
 	    {
-		delete screen;
+		return screen_bmp;
+	    }
+
+	    void set_screen_bmp(BerrnBitmap *bitmap)
+	    {
+		delete screen_bmp;
 		if (bitmap->format() == BerrnRGB)
 		{
 		    BerrnBitmapRGB *bmp = reinterpret_cast<BerrnBitmapRGB*>(bitmap);
 		    int rot_flags = (get_flags() & berrn_rot_mask);
-		    screen = rotateBitmapRGB(bmp, rot_flags);
+		    screen_bmp = rotateBitmapRGB(bmp, rot_flags);
 		}
 		else
 		{
-		    screen = bitmap;
+		    screen_bmp = bitmap;
 		}
 	    }
 
@@ -662,6 +820,8 @@ namespace berrn
 		return scheduler;
 	    }
 
+	
+
 	protected:
 	    berrnmixer *mixer = NULL;
 
@@ -671,7 +831,8 @@ namespace berrn
 
 	    string samplespath = "";
 
-	    BerrnBitmap *screen = NULL;
+	    berrnscreen *screen = NULL;
+	    BerrnBitmap *screen_bmp = NULL;
 
 	    void closefiles()
 	    {
@@ -763,6 +924,72 @@ namespace berrn
 	    float out_step = 0.0f;
 	    float in_step = 0.0f;
 	    float out_time = 0.0f;
+    };
+
+    class LIBBLUEBERRN_API berrnscanlinetimer
+    {
+	public:
+	    berrnscanlinetimer(berrndriver &drv) : driver(drv)
+	    {
+		scanline_timer = new BerrnTimer("Scanline", driver.get_scheduler(), [&](int64_t, int64_t)
+		{
+		    tick_scanline();
+		});
+	    }
+
+	    void configure(function<void(int)> callback, int first_vpos, int increment)
+	    {
+		m_callback = callback;
+		m_first_vpos = first_vpos;
+		m_increment = increment;
+	    }
+
+	    void init()
+	    {
+		m_first_time = true;
+		scanline_timer->start(time_zero(), false);
+	    }
+
+	    void shutdown()
+	    {
+		scanline_timer->stop();
+	    }
+
+	private:
+	    berrndriver &driver;
+
+	    function<void(int)> m_callback;
+	    int m_first_vpos = 0;
+	    int m_increment = 0;
+
+	    bool m_first_time = false;
+
+	    BerrnTimer *scanline_timer = NULL;
+
+	    void tick_scanline()
+	    {
+		auto screen = driver.get_screen();
+		int next_vpos = m_first_vpos;
+
+		if (!m_first_time)
+		{
+		    int vpos = screen->vpos();
+
+		    if (m_callback)
+		    {
+			m_callback(vpos);
+		    }
+
+		    if ((m_increment != 0) && (vpos + m_increment) < screen->get_height())
+		    {
+			next_vpos = (vpos + m_increment);
+		    }
+		}
+
+		m_first_time = false;
+
+		scanline_timer->start(screen->time_until_pos(next_vpos), false);
+	    }
     };
 
     inline vector<berrndriver*> drivers;

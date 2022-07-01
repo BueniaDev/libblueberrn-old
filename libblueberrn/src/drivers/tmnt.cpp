@@ -515,7 +515,6 @@ namespace berrn
 	    driver.add_mono_sample(ym_sample);
 	}
 
-	/*
 	for (auto &k007232_sample : k007232_samples)
 	{
 	    driver.add_mono_sample(k007232_sample, 0.33);
@@ -527,7 +526,6 @@ namespace berrn
 	}
 
 	driver.add_mono_sample(title_samples[0], 0.5);
-	*/
     }
 
     TMNTCore::TMNTCore(berrndriver &drv) : driver(drv)
@@ -729,8 +727,8 @@ namespace berrn
 	    case 4: data = 0xFF; break; // P4
 	    case 5: data = 0xFF; break; // DSW1
 	    case 6: data = 0x5E; break; // DSW2
-	    // case 7: data = 0xFF; break; // DSW3
-	    case 7: data = 0xFB; break; // DSW3
+	    case 7: data = 0xFF; break; // DSW3
+	    // case 7: data = 0xFB; break; // DSW3
 	    default: break; 
 	}
 

@@ -7,6 +7,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
 
 option(BUILD_SDL2 "Enables the command-line frontend (requires SDL2)." OFF)
+option(BUILD_DEBUG "Enables the debug build (includes drivers that boot, but are still far from playable." OFF)
+option(BUILD_DEVELOPER "Enables the developer build (includes all functional and WIP drivers, for developers only)." OFF)
 
 set(LIBBLUEBERRN_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/include")
 
@@ -17,6 +19,14 @@ include_directories(AFTER PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libblueberrn/inclu
 
 if (BUILD_SDL2 STREQUAL "ON")
 	add_subdirectory(blueberrn-SDL)
+endif()
+
+if (BUILD_DEBUG)
+	add_compile_definitions(BERRN_DEBUG_BUILD)
+endif()
+
+if (BUILD_DEVELOPER)
+	add_compile_definitions(BERRN_DEVELOPER_BUILD)
 endif()
 
 add_subdirectory(libblueberrn)

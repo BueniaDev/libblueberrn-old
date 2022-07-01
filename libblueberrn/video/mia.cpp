@@ -22,17 +22,6 @@ using namespace std;
 
 namespace berrn
 {
-    static BerrnGfxLayout mia_obj_layout = 
-    {
-	16, 16,
-	8192,
-	4,
-	{24, 16, 8, 0},
-	{gfx_step8(0, 1), gfx_step8(256, 1)},
-	{gfx_step8(0, 32), gfx_step8(512, 32)},
-	128*8
-    };
-
     miavideo::miavideo(berrndriver &drv) : driver(drv)
     {
 	bitmap = new BerrnBitmapRGB(304, 224);
@@ -75,7 +64,7 @@ namespace berrn
 	    return tilemap->create_tilemap_addr(tile_addr, attrib_byte);
 	};
 
-	auto sprite_callback = [&](uint16_t&, uint8_t &color_attrib, uint8_t&, bool&) -> void
+	auto sprite_callback = [&](uint16_t&, uint16_t &color_attrib, uint8_t&, bool&) -> void
 	{
 	    color_attrib = (16 + (color_attrib & 0xF));
 	};
@@ -123,15 +112,13 @@ namespace berrn
 	    sprite_rom[addr + 3] = uint8_t(rom_data >> 24);
 	}
 
-	gfxDecodeSet(mia_obj_layout, sprite_rom, obj_tiles);
-
 	tilemap->setCallback(tile_callback);
 	tilemap->init();
 	tilemap->setROM(tile_rom);
 
 	spritemap->init();
 	spritemap->setROM(sprite_rom);
-	spritemap->setTiles(obj_tiles);
+	spritemap->setLayout(K051960Layout::MIA);
 	spritemap->setSpriteCallback(sprite_callback);
     }
 
@@ -169,7 +156,7 @@ namespace berrn
 	render_tile_layer(1, false);
 	updateSprites();
 	render_tile_layer(0, false);
-	driver.set_screen(bitmap);
+	driver.set_screen_bmp(bitmap);
     }
 
     void miavideo::updateSprites()
@@ -184,7 +171,7 @@ namespace berrn
 		size_t index = (xpos + (ypos * 512));
 		uint32_t sprite_buffer = obj_buffer.at(index);
 		int color_num = (sprite_buffer & 0xF);
-		int color_attrib = (sprite_buffer >> 4);
+		int color_attrib = ((sprite_buffer >> 4) & 0xFF);
 
 		if (color_num == 0)
 		{

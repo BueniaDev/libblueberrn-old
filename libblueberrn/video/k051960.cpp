@@ -22,6 +22,40 @@ using namespace std;
 
 namespace berrn
 {
+    static const BerrnGfxLayout layout_base = 
+    {
+	16, 16,
+	berrn_rgn_frac(1, 1),
+	4,
+	{0, 8, 16, 24},
+	{gfx_step8(0, 1), gfx_step8(256, 1)},
+	{gfx_step8(0, 32), gfx_step8(512, 32)},
+	1024
+    };
+
+    static const BerrnGfxLayout layout_mia = 
+    {
+	16, 16,
+	berrn_rgn_frac(1, 1),
+	4,
+	{24, 16, 8, 0},
+	{gfx_step8(0, 1), gfx_step8(256, 1)},
+	{gfx_step8(0, 32), gfx_step8(512, 32)},
+	1024
+    };
+
+    static const BerrnGfxLayout layout_gradius3 = 
+    {
+	16, 16,
+	berrn_rgn_frac(1, 1),
+	4,
+	{0, 1, 2, 3},
+	{gfx_step2(8, 4), gfx_step2(0, 4), gfx_step2(24, 4), gfx_step2(16, 4),
+	    gfx_step2(264, 4), gfx_step2(256, 4), gfx_step2(280, 4), gfx_step2(272, 4)},
+	{gfx_step8(0, 32), gfx_step8(512, 32)},
+	1024
+    };
+
     k051960video::k051960video(berrndriver &drv) : driver(drv)
     {
 
@@ -35,17 +69,29 @@ namespace berrn
     void k051960video::init()
     {
 	obj_ram.fill(0);
+	gfx_layout = layout_base;
 	shadow_config = 0;
+    }
+
+    void k051960video::setLayout(K051960Layout layout)
+    {
+	switch (layout)
+	{
+	    case Base: gfx_layout = layout_base; break;
+	    case MIA: gfx_layout = layout_mia; break;
+	    case Gradius3: gfx_layout = layout_gradius3; break;
+	    default: gfx_layout = layout_base; break;
+	}
+
+	obj_tiles.clear();
+	gfxDecodeSet(gfx_layout, obj_rom, obj_tiles);
     }
 
     void k051960video::setROM(vector<uint8_t> &rom)
     {
 	obj_rom = vector<uint8_t>(rom.begin(), rom.end());
-    }
-
-    void k051960video::setTiles(vector<uint8_t> &tiles)
-    {
-	obj_tiles = vector<uint8_t>(tiles.begin(), tiles.end());
+	obj_tiles.clear();
+	gfxDecodeSet(gfx_layout, obj_rom, obj_tiles);
     }
 
     void k051960video::setSpriteCallback(k051960callback cb)
@@ -106,7 +152,7 @@ namespace berrn
 	    uint8_t attrib7 = obj_ram.at(sprite_offs + 7);
 
 	    uint16_t sprite_num = (((attrib1 & 0x1F) << 8) | attrib2);
-	    uint8_t color_attrib = attrib3;
+	    uint16_t color_attrib = attrib3;
 	    uint8_t priority = 0;
 
 	    bool is_shadow = false;
@@ -272,23 +318,22 @@ namespace berrn
 
     uint8_t k051960video::fetchROMData(int offs)
     {
-	uint32_t addr = rom_offset;
-	addr += ((sprite_rom_bank[0] << 8) + ((sprite_rom_bank[1] & 0x3) << 16));
+	uint32_t addr = rom_offset + (sprite_rom_bank[0] << 8) + ((sprite_rom_bank[1] & 0x3) << 16);
 	uint16_t sprite_code = ((addr & 0x3FFE0) >> 5);
 	int off1 = (addr & 0x1F);
-	uint8_t color = (((sprite_rom_bank[1] & 0xFC) << 2) + ((sprite_rom_bank[2] & 0x3) << 6));
+	uint16_t color = ((sprite_rom_bank[1] & 0xFC) >> 2) + ((sprite_rom_bank[2] & 0x3) << 6);
 	uint8_t priority = 0;
-	bool is_shadow = false;
+	bool is_shadow = testbit(color, 7);
 
 	if (spritecb)
 	{
 	    spritecb(sprite_code, color, priority, is_shadow);
 	}
 
-	addr = ((sprite_code << 7) | (off1 << 2) | (offs & 3));
-	addr &= (obj_rom.size() - 1);
+	uint32_t sprite_addr = (sprite_code << 7) | (off1 << 2) | (offs & 0x3);
 
-	return obj_rom.at(addr);
+	sprite_addr %= obj_rom.size();
+	return obj_rom.at(sprite_addr);
     }
 
     uint8_t k051960video::read(uint16_t addr)
@@ -303,7 +348,14 @@ namespace berrn
 		case 6:
 		case 7:
 		{
-		    data = fetchROMData((addr & 3));
+		    if (is_rmrd)
+		    {
+			data = fetchROMData(addr & 3);
+		    }
+		    else
+		    {
+			data = 0;
+		    }
 		}
 		break;
 		default: cout << "Reading value from K051960 address of " << hex << int(addr) << endl; break;
@@ -342,13 +394,9 @@ namespace berrn
 		    shadow_config = (data & 0x7);
 		}
 		break;
-		case 2:
-		case 3:
-		case 4:
-		{
-		    sprite_rom_bank.at(addr - 2) = data;
-		}
-		break;
+		case 2: sprite_rom_bank[0] = data; break;
+		case 3: sprite_rom_bank[1] = data; break;
+		case 4: sprite_rom_bank[2] = data; break;
 		default: cout << "Writing value of " << hex << int(data) << " to K051960 address of " << hex << int(addr) << endl; break;
 	    }
 	}

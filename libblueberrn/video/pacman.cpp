@@ -133,7 +133,7 @@ namespace berrn
 	    draw_sprite(sprite_num, xpos, ypos, pal_num, xflip, yflip);
 	}
 
-	driver.set_screen(bitmap);
+	driver.set_screen_bmp(bitmap);
     }
 
     void pacmanvideo::draw_tile(uint32_t tile_num, int xcoord, int ycoord, int pal_num)

@@ -29,18 +29,19 @@ namespace berrn
 {
     struct DriverList
     {
+	#ifdef BERRN_DEVELOPER_BUILD
 	void init()
 	{
 	    DRIVER(example); // Example driver
 	    DRIVER(invaders); // Playable, but no sound
-	    DRIVER(galaxian); // No sprites, input or sound
+	    DRIVER(galaxian); // No input or sound
 	    DRIVER(pacman); // No input or sound
 	    DRIVER(galaga); // WIP (relies on several Namco custom chips)
 	    DRIVER(bosco); // WIP (relies on several Namco custom chips)
 	    DRIVER(wboy2u); // WIP (TODO: Implement graphics support)
 	    DRIVER(rastan); // WIP (TODO: Finish PC080SN implementation)
 	    DRIVER(centiped); // WIP (TODO: Implement Pokey core for libblueberrn)
-	    DRIVER(1942); // Missing a few inputs, but otherwise should be functional
+	    DRIVER(1942); // Should be fully playable
 	    DRIVER(1943u); // WIP
 	    DRIVER(tmnt); // Should be fully playable
 	    DRIVER(tmntu); // Should be fully playable
@@ -56,6 +57,37 @@ namespace berrn
 	    DRIVER(bombjack); // Missing inputs
 	    DRIVER(gradius); // WIP
 	}
+	#elif defined(BERRN_DEBUG_BUILD)
+	void init()
+	{
+	    DRIVER(example); // Example driver
+	    DRIVER(invaders); // Playable, but no sound
+	    DRIVER(galaxian); // No input or sound
+	    DRIVER(pacman); // Should be fully playable
+	    DRIVER(1942); // Should be fully playable
+	    DRIVER(tmnt); // Should be fully playable
+	    DRIVER(tmntu); // Should be fully playable
+	    DRIVER(tmht); // Should be fully playable
+	    DRIVER(mia); // Should be fully playable
+	    DRIVER(punkshot); // No input or sound
+	    DRIVER(shuriboy); // No input or sound
+	    DRIVER(mariorou); // No input or sound
+	    DRIVER(bombjack); // Missing inputs
+	}
+	#else
+	void init()
+	{
+	    DRIVER(example); // Example driver
+	    DRIVER(invaders); // Playable, but no sound
+	    // DRIVER(galaxian); // No input or sound
+	    DRIVER(pacman); // Should be fully playable
+	    DRIVER(1942); // Should be fully playable
+	    DRIVER(tmnt); // Should be fully playable
+	    DRIVER(tmntu); // Should be fully playable
+	    DRIVER(tmht); // Should be fully playable
+	    DRIVER(mia); // Should be fully playable
+	}
+	#endif
     };
 };
 

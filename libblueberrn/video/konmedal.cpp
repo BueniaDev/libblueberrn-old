@@ -114,7 +114,7 @@ namespace berrn
 	}
 
 	tilemap->logRender();
-	driver.set_screen(bitmap);
+	driver.set_screen_bmp(bitmap);
 
 	if (is_dump_active)
 	{

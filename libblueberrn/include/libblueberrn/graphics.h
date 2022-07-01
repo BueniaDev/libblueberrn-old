@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <cassert>
 #include <bitset>
 #include <chrono>
 #include <utils.h>
@@ -96,6 +97,32 @@ namespace berrn
 	    }
 
 	    return *this;
+	}
+
+	berrnRGBA &operator +(const berrnRGBA &c)
+	{
+	    red = clamp<uint8_t>((red + c.red), 0, 255);
+	    green = clamp<uint8_t>((green + c.green), 0, 255);
+	    blue = clamp<uint8_t>((blue + c.blue), 0, 255);
+	    return *this;
+	}
+
+	berrnRGBA &operator +=(const berrnRGBA &c)
+	{
+	    return (*this + c);
+	}
+
+	berrnRGBA &operator -(const berrnRGBA &c)
+	{
+	    red = clamp<uint8_t>((red - c.red), 0, 255);
+	    green = clamp<uint8_t>((green - c.green), 0, 255);
+	    blue = clamp<uint8_t>((blue - c.blue), 0, 255);
+	    return *this;
+	}
+
+	berrnRGBA &operator -=(const berrnRGBA &c)
+	{
+	    return (*this - c);
 	}
 
 	berrnRGBA &operator *(const float value)
@@ -278,7 +305,7 @@ namespace berrn
 		if (!inRange(offs, 0, numEntries()))
 		{
 		    stringstream ss;
-		    ss << "Invalid entry offset of " << dec << offs;
+		    ss << "Invalid palette entry offset of " << dec << offs;
 		    throw out_of_range(ss.str());
 		}
 
@@ -606,6 +633,13 @@ namespace berrn
 	return bitmap;
     }
 
+    #define berrn_rgn_frac(num, den) (0x80000000 | (((num) & 0xF) << 27) | (((den) & 0xF) << 23))
+
+    #define is_berrn_frac(offs) testbit((offs), 31)
+    #define berrn_frac_num(offs) (((offs) >> 27) & 0xF)
+    #define berrn_frac_den(offs) (((offs) >> 23) & 0xF)
+    #define berrn_frac_offset(offs) ((offs) & 0x7FFFFF)
+
     #define gfx_step2(start, step) start, (start + step)
     #define gfx_step4(start, step) gfx_step2(start, step), gfx_step2((start + (2 * step)), step)
     #define gfx_step8(start, step) gfx_step4(start, step), gfx_step4((start + (4 * step)), step)
@@ -616,11 +650,11 @@ namespace berrn
     {
 	int width; // Width of a tile (in pixels)
 	int height; // Height of a tile (in pixels)
-	int num_tiles; // Number of total tiles
+	uint32_t num_tiles; // Number of total tiles
 	int num_planes; // Number of bit planes
-	array<int, 4> plane_offs; // Offset of bit planes (in bits)
-	array<int, 32> x_offs; // Offset of pixel x-coordinate in bits relative to one bitplane (in bits)
-	array<int, 32> y_offs; // Offset of pixel y-coordinate in bits relative to one bitplane (in bits)
+	array<uint32_t, 4> plane_offs; // Offset of bit planes (in bits)
+	array<uint32_t, 32> x_offs; // Offset of pixel x-coordinate in bits relative to one bitplane (in bits)
+	array<uint32_t, 32> y_offs; // Offset of pixel y-coordinate in bits relative to one bitplane (in bits)
 	int delta; // Length of an individual tile (in bits)
     };
 
@@ -642,6 +676,24 @@ namespace berrn
 		gfx_layout = layout;
 		gfx_rom = src;
 
+		size_t region_length = (src.size() * 8);
+
+		if (is_berrn_frac(gfx_layout.num_tiles))
+		{
+		    assert(region_length != 0);
+		    gfx_layout.num_tiles = ((region_length / gfx_layout.delta) * berrn_frac_num(gfx_layout.num_tiles) / berrn_frac_den(gfx_layout.num_tiles));
+		}
+
+		for (int i = 0; i < gfx_layout.num_planes; i++)
+		{
+		    uint32_t value = gfx_layout.plane_offs.at(i);
+		    if (is_berrn_frac(value))
+		    {
+			assert(region_length != 0);
+			gfx_layout.plane_offs.at(i) = (berrn_frac_offset(value) + (region_length * berrn_frac_num(value) / berrn_frac_den(value)));
+		    }
+		}
+
 		line_mod = gfx_layout.width;
 		char_mod = (line_mod * gfx_layout.height);
 		gfx_data.resize((gfx_layout.num_tiles * char_mod), 0);
@@ -649,7 +701,7 @@ namespace berrn
 
 	    void decode()
 	    {
-		for (int i = 0; i < gfx_layout.num_tiles; i++)
+		for (uint32_t i = 0; i < gfx_layout.num_tiles; i++)
 		{
 		    decode_tile(i);
 		}

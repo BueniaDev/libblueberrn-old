@@ -32,7 +32,7 @@ namespace berrn
     class LIBBLUEBERRN_API AliensMainInterface : public BerrnInterface
     {
 	public:
-	    AliensMainInterface(berrndriver &drv, AliensCore &cb);
+	    AliensMainInterface(berrndriver &drv, AliensCore &core);
 	    ~AliensMainInterface();
 
 	    void init();
@@ -43,7 +43,7 @@ namespace berrn
 
 	private:
 	    berrndriver &driver;
-	    AliensCore &core;
+	    AliensCore &main_core;
 
 	    vector<uint8_t> main_rom;
 	    array<uint8_t, 0x1C00> main_ram;
@@ -59,11 +59,21 @@ namespace berrn
 	    void stop_core();
 	    void run_core();
 
+	    uint8_t readBank0000(uint16_t addr);
+	    void writeBank0000(uint16_t addr, uint8_t data);
+
+	    void writeCoinCounter(uint8_t data);
+
 	private:
 	    berrndriver &driver;
 
 	    AliensMainInterface *main_inter = NULL;
 	    BerrnKonami2CPU *main_cpu = NULL;
+
+	    bool is_bank_0000_ram = false;
+
+	    array<uint8_t, 0x400> palette_ram;
+	    array<uint8_t, 0x400> bank_0000_ram;
     };
 
     class LIBBLUEBERRN_API driveraliens : public berrndriver

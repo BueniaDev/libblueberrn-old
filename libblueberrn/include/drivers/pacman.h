@@ -23,6 +23,7 @@
 #include <driver.h>
 #include <cpu/zilogz80.h>
 #include <video/pacman.h>
+#include <audio/wsg.h>
 using namespace berrn;
 using namespace std;
 
@@ -37,6 +38,8 @@ namespace berrn
 	    bool init_core();
 	    void stop_core();
 	    void run_core();
+	    void key_changed(BerrnInput key, bool is_pressed);
+	    void process_audio();
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
@@ -44,9 +47,6 @@ namespace berrn
 
 	private:
 	    berrndriver &driver;
-
-	    // BerrnZ80Processor *main_proc = NULL;
-	    // BerrnCPU *main_cpu = NULL;
 	    BerrnZ80CPU *main_cpu = NULL;
 
 	    void writeLatch(int addr, bool line);
@@ -61,7 +61,12 @@ namespace berrn
 
 	    uint8_t irq_vector = 0;
 
+	    uint8_t port0_val = 0;
+	    uint8_t port1_val = 0;
+
 	    pacmanvideo *video = NULL;
+
+	    wsg3device *audio_chip = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
     };
@@ -81,6 +86,7 @@ namespace berrn
 	    void drvrun();
 
 	    void keychanged(BerrnInput key, bool is_pressed);
+	    void process_audio();
 
 	private:
 	    PacmanCore *core = NULL;

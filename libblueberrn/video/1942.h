@@ -39,9 +39,6 @@ namespace berrn
 
 	    void updatePixels();
 
-	    void writeScroll(bool is_msb, uint8_t data);
-	    void writePaletteBank(uint8_t data);
-
 	    uint8_t readBG(uint16_t addr);
 	    void writeBG(uint16_t addr, uint8_t data);
 
@@ -51,39 +48,37 @@ namespace berrn
 	    uint8_t readOBJ(uint16_t addr);
 	    void writeOBJ(uint16_t addr, uint8_t data);
 
+	    void writeScroll(bool is_msb, uint8_t data);
+	    void writePaletteBank(uint8_t data);
+
 	private:
 	    berrndriver &driver;
-
 	    array<uint8_t, 0x400> bg_vram;
 	    array<uint8_t, 0x800> fg_vram;
-	    array<uint8_t, 0x80> obj_vram;
+	    array<uint8_t, 0x80> obj_ram;
 
-	    array<array<uint8_t, 0x100>, 4> bg_palettes;
-	    array<uint8_t, 0x100> fg_palettes;
-	    array<uint8_t, 0x100> obj_palettes;
+	    void updateBG();
+	    void updateSprites();
+	    void updateFG();
 
-	    array<berrnRGBA, 256> colors;
+	    void renderSprite(int sprite_num, int color, int xcoord, int ycoord);
+
+	    void initPalettes();
 
 	    vector<uint8_t> bg_tiles;
 	    vector<uint8_t> fg_tiles;
 	    vector<uint8_t> obj_tiles;
 
-	    void updateBackground();
-	    void drawBGTile(uint32_t tile_num, int pal_num, int xcoord, int ycoord, bool flipx, bool flipy);
+	    array<berrnRGBA, 256> colors;
+	    array<array<uint8_t, 0x100>, 4> bg_palettes;
+	    array<uint8_t, 0x100> fg_palettes;
+	    array<uint8_t, 0x100> obj_palettes;
 
-	    void updateForeground();
-	    void drawFGTile(uint32_t tile_num, int pal_num, int xcoord, int ycoord);
-
-	    void updateSprites();
-	    void drawSprite(uint32_t sprite_num, int pal_num, int xcoord, int ycoord);
-
-	    void initPalettes();
-
-	    uint16_t scroll_x = 0;
+	    uint16_t scrollx = 0;
 	    int palette_bank = 0;
 
-	    int clip_min = 0;
-	    int clip_max = 0;
+	    int clip_miny = 0;
+	    int clip_maxy = 0;
 
 	    BerrnBitmapRGB *bitmap = NULL;
     };

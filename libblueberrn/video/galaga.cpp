@@ -124,7 +124,7 @@ namespace berrn
 	    }
 	}
 
-	driver.set_screen(bitmap);
+	driver.set_screen_bmp(bitmap);
     }
 
     void galagavideo::draw_tile(uint32_t tile_num, int xcoord, int ycoord, int pal_num)

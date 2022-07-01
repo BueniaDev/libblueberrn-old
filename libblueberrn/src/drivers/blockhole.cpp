@@ -70,6 +70,10 @@ namespace berrn
 	{
 	    data = main_ram.at(addr - 0x4000);
 	}
+	else if (inRange(addr, 0x5800, 0x6000))
+	{
+	    data = main_core.readBank5800(addr);
+	}
 	else
 	{
 	    data = BerrnInterface::readCPU8(addr);
@@ -105,6 +109,10 @@ namespace berrn
 	{
 	    main_ram.at(addr - 0x4000) = data;
 	}
+	else if (inRange(addr, 0x5800, 0x6000))
+	{
+	    main_core.writeBank5800(addr, data);
+	}
 	else
 	{
 	    BerrnInterface::writeCPU8(addr, data);
@@ -134,8 +142,10 @@ namespace berrn
 	auto &scheduler = driver.get_scheduler();
 	main_inter->init();
 	main_cpu->init();
-
 	scheduler.add_device(main_cpu);
+	palette_ram.fill(0);
+	bank_5800_ram.fill(0);
+	is_bank_5800_ram = false;
 	return true;
     }
 
@@ -173,6 +183,39 @@ namespace berrn
 	string rmrd_str = testbit(data, 6) ? "Asserting" : "Clearing";
 	cout << bank_str << " bank 5800 line..." << endl;
 	cout << rmrd_str << " K052109 RM/RD line..." << endl;
+
+	is_bank_5800_ram = testbit(data, 5);
+    }
+
+    uint8_t BlockHoleCore::readBank5800(uint16_t addr)
+    {
+	uint8_t data = 0;
+	addr &= 0x7FF;
+
+	if (is_bank_5800_ram)
+	{
+	    data = bank_5800_ram.at(addr);
+	}
+	else
+	{
+	    data = palette_ram.at(addr);
+	}
+
+	return data;
+    }
+
+    void BlockHoleCore::writeBank5800(uint16_t addr, uint8_t data)
+    {
+	addr &= 0x7FF;
+
+	if (is_bank_5800_ram)
+	{
+	    bank_5800_ram.at(addr) = data;
+	}
+	else
+	{
+	    palette_ram.at(addr) = data;
+	}
     }
 
     driverblockhl::driverblockhl()

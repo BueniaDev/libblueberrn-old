@@ -558,7 +558,7 @@ class SDL2Frontend : public BlueberrnFrontend
 	    auto driver = core->getDriver();
 	    SDL_RenderClear(render);
 
-	    BerrnBitmap *bitmap = driver->get_screen();
+	    BerrnBitmap *bitmap = driver->get_screen_bmp();
 
 	    if (bitmap == NULL)
 	    {
@@ -653,12 +653,6 @@ class SDL2Frontend : public BlueberrnFrontend
 	vector<uint8_t> readfile(string dirname, string subdirname, string filename)
 	{
 	    vector<uint8_t> temp;
-	    cout << "Reading file from local directory" << endl;
-	    cout << "Directory name: " << dirname << endl;
-	    cout << "Subdirectory name: " << subdirname << endl;
-	    cout << "Filename: " << filename << endl;
-	    cout << endl;
-
 	    fs::path dir_path = dirname;
 
 	    vector<fs::path> target_paths = 
@@ -700,7 +694,6 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	vector<uint8_t> loadfile(string filename)
 	{
-	    cout << "Loading file of " << filename << endl;
 	    vector<uint8_t> temp;
 	    ifstream file(filename, ios::in | ios::binary | ios::ate);
 

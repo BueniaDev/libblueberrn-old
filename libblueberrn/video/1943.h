@@ -28,7 +28,62 @@ using namespace std;
 
 namespace berrn
 {
+    class berrn1943video
+    {
+	public:
+	    berrn1943video(berrndriver &drv);
+	    ~berrn1943video();
 
+	    void writeBG2Scroll(bool is_msb, uint8_t data);
+	    void writeBGScrollX(bool is_msb, uint8_t data);
+	    void writeBGScrollY(uint8_t data);
+	    void writeD806(uint8_t data);
+
+	    void init();
+	    void shutdown();
+	    void updatePixels();
+
+	private:
+	    berrndriver &driver;
+
+	    void updateBG1();
+	    void updateBG2();
+
+	    void initPalettes();
+
+	    BerrnBitmapRGB *bitmap = NULL;
+
+	    vector<uint8_t> bg_tiles;
+	    vector<uint8_t> bg2_tiles;
+
+	    void setPriorPixel(int xpos, int ypos, int bit)
+	    {
+		if (!inRange(xpos, 0, 256) || !inRange(ypos, 0, 224))
+		{
+		    return;
+		}
+
+		int offs = (xpos + (ypos * 256));
+		prior_bmp.at(offs) = setbit(prior_bmp.at(offs), bit);
+	    }
+
+	    vector<uint8_t> tile_rom;
+
+	    array<uint8_t, 0x100> bg_palettes;
+	    array<uint8_t, 0x100> fg_palettes;
+	    array<berrnRGBA, 256> colors;
+
+	    array<uint8_t, (256 * 224)> prior_bmp;
+
+	    array<bool, 256> is_fg_transparent;
+
+	    bool is_bg1_enabled = false;
+	    bool is_bg2_enabled = false;
+
+	    uint16_t bg2_scrollx = 0;
+	    uint16_t bg_scrollx = 0;
+	    uint8_t bg_scrolly = 0;
+    };
 };
 
 #endif // BERRN_1943_VIDEO_H

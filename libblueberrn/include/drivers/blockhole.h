@@ -67,11 +67,19 @@ namespace berrn
 
 	    uint8_t readDIP(int bank);
 
+	    uint8_t readBank5800(uint16_t addr);
+	    void writeBank5800(uint16_t addr, uint8_t data);
+
 	private:
 	    berrndriver &driver;
 
 	    BlockHoleMainInterface *main_inter = NULL;
 	    BerrnKonami2CPU *main_cpu = NULL;
+
+	    bool is_bank_5800_ram = false;
+
+	    array<uint8_t, 0x800> palette_ram;
+	    array<uint8_t, 0x800> bank_5800_ram;
     };
 
     class LIBBLUEBERRN_API driverblockhl : public berrndriver

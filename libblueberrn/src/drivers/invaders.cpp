@@ -214,7 +214,7 @@ namespace berrn
 	    }
 	}
 
-	driver.set_screen(bitmap);
+	driver.set_screen_bmp(bitmap);
     }
 
     driverinvaders::driverinvaders()

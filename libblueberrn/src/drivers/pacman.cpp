@@ -37,6 +37,9 @@ namespace berrn
 	    berrn_rom_load("pacman.5e", 0x0000, 0x1000)
 	berrn_rom_region("gfx2", 0x1000, 0)
 	    berrn_rom_load("pacman.5f", 0x0000, 0x1000)
+	berrn_rom_region("namco", 0x0200, 0)
+	    berrn_rom_load("82s126.1m", 0x0000, 0x0100)
+	    berrn_rom_load("82s126.3m", 0x0100, 0x0100)
     berrn_rom_end
 
     PacmanCore::PacmanCore(berrndriver &drv) : driver(drv)
@@ -45,6 +48,8 @@ namespace berrn
 	main_cpu = new BerrnZ80CPU(driver, 3072000, *this);
 
 	video = new pacmanvideo(driver);
+
+	audio_chip = new wsg3device(driver);
 
 	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
 	{
@@ -71,6 +76,9 @@ namespace berrn
 	main_rom = driver.get_rom_region("maincpu");
 	main_ram.fill(0);
 	video->init();
+	audio_chip->init(96000);
+	port0_val = 0xFF;
+	port1_val = 0xFF;
 	driver.resize(288, 224, 2);
 	return true;
     }
@@ -86,6 +94,54 @@ namespace berrn
     void PacmanCore::run_core()
     {
 	driver.run_scheduler();
+    }
+
+    void PacmanCore::key_changed(BerrnInput key, bool is_pressed)
+    {
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		port0_val = changebit(port0_val, 5, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		port1_val = changebit(port1_val, 5, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnUpP1:
+	    {
+		port0_val = changebit(port0_val, 0, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		port0_val = changebit(port0_val, 1, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		port0_val = changebit(port0_val, 2, !is_pressed);
+	    }
+	    break;
+	    case BerrnInput::BerrnDownP1:
+	    {
+		port0_val = changebit(port0_val, 3, !is_pressed);
+	    }
+	    break;
+	    default: break;
+	}
+    }
+
+    void PacmanCore::process_audio()
+    {
+	auto samples = audio_chip->fetch_samples();
+
+	for (auto &sample : samples)
+	{
+	    driver.add_mono_sample(sample);
+	}
     }
 
     uint8_t PacmanCore::readCPU8(uint16_t addr)
@@ -169,12 +225,12 @@ namespace berrn
 	if (inRange(addr, 0x5000, 0x5040))
 	{
 	    // IN0
-	    data = 0xFF;
+	    data = port0_val;
 	}
 	else if (inRange(addr, 0x5040, 0x5080))
 	{
 	    // IN1
-	    data = 0xFF;
+	    data = port1_val;
 	}
 	else if (inRange(addr, 0x5080, 0x50C0))
 	{
@@ -199,7 +255,7 @@ namespace berrn
 	}
 	else if (inRange(addr, 0x5040, 0x5060))
 	{
-	    cout << "Writing value of " << hex << int(data) << " to Namco WSG3 device of " << hex << int(addr & 0x1F) << endl;
+	    audio_chip->write_reg((addr & 0x1F), data);
 	}
 	else if (inRange(addr, 0x5060, 0x5070))
 	{
@@ -230,14 +286,7 @@ namespace berrn
 	    break;
 	    case 1:
 	    {
-		if (line)
-		{
-		    cout << "Sound enabled" << endl;
-		}
-		else
-		{
-		    cout << "Sound disabled" << endl;
-		}
+		audio_chip->set_sound_enabled(line);
 	    }
 	    break;
 	    case 3:
@@ -302,46 +351,11 @@ namespace berrn
 
     void driverpacman::keychanged(BerrnInput key, bool is_pressed)
     {
-	string key_state = (is_pressed) ? "pressed" : "released";
+	core->key_changed(key, is_pressed);
+    }
 
-	switch (key)
-	{
-	    case BerrnInput::BerrnCoin:
-	    {
-		cout << "Coin button has been " << key_state << endl;
-	    }
-	    break;
-	    case BerrnInput::BerrnStartP1:
-	    {
-		cout << "P1 start button has been " << key_state << endl;
-	    }
-	    break;
-	    case BerrnInput::BerrnLeftP1:
-	    {
-		cout << "P1 left button has been " << key_state << endl;
-	    }
-	    break;
-	    case BerrnInput::BerrnRightP1:
-	    {
-		cout << "P1 right button has been " << key_state << endl;
-	    }
-	    break;
-	    case BerrnInput::BerrnUpP1:
-	    {
-		cout << "P1 up button has been " << key_state << endl;
-	    }
-	    break;
-	    case BerrnInput::BerrnDownP1:
-	    {
-		cout << "P1 down button has been " << key_state << endl;
-	    }
-	    break;
-	    case BerrnInput::BerrnButton1P1:
-	    {
-		cout << "P1 button 1 has been " << key_state << endl;
-	    }
-	    break;
-	    default: break;
-	}
+    void driverpacman::process_audio()
+    {
+	core->process_audio();
     }
 };

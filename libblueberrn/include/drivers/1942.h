@@ -47,10 +47,10 @@ namespace berrn
 	    berrndriver &driver;
 	    Berrn1942Core &main_core;
 
-	    int current_rom_bank = 0;
-
 	    vector<uint8_t> main_rom;
 	    array<uint8_t, 0x1000> main_ram;
+
+	    int current_rom_bank = 0;
     };
 
     class LIBBLUEBERRN_API Berrn1942Sound : public BerrnInterface
@@ -61,10 +61,11 @@ namespace berrn
 
 	    void init();
 	    void shutdown();
-	    void process_audio();
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
+
+	    void processAudio();
 
 	private:
 	    berrndriver &driver;
@@ -86,39 +87,22 @@ namespace berrn
 	    bool init_core();
 	    void stop_core();
 	    void run_core();
-	    void process_audio();
-
 	    void key_changed(BerrnInput key, bool is_pressed);
 
-	    uint8_t readDIP(int reg);
-
-	    void writeIO(int reg, uint8_t data);
+	    void process_audio();
 
 	    uint8_t readGraphics(int bank, uint16_t addr);
 	    void writeGraphics(int bank, uint16_t addr, uint8_t data);
 
+	    void writeIO(int addr, uint8_t data);
+
+	    uint8_t readDIP(int reg);
+
 	    uint8_t readSoundLatch();
+	    void writeSoundLatch(uint8_t data);
 
 	private:
 	    berrndriver &driver;
-
-	    void writeSoundLatch(uint8_t data);
-	    void writeC804(uint8_t data);
-
-	    uint8_t p1_port = 0;
-
-	    berrn1942video *video = NULL;
-
-	    int vpos();
-	    int64_t time_until_pos(int vpos);
-
-	    void scanline_callback(int scanline);
-
-	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *irq_timer = NULL;
-
-	    int64_t vblank_start_time = 0;
-	    bool is_first_time = false;
 
 	    Berrn1942Main *main_inter = NULL;
 	    BerrnZ80CPU *main_cpu = NULL;
@@ -126,7 +110,17 @@ namespace berrn
 	    Berrn1942Sound *sound_inter = NULL;
 	    BerrnZ80CPU *sound_cpu = NULL;
 
+	    berrnscanlinetimer *timer = NULL;
+
+	    berrn1942video *video = NULL;
+
+	    void scanline_callback(int vpos);
+
+	    void writeC804(uint8_t data);
+
 	    uint8_t sound_cmd = 0;
+	    uint8_t system_reg = 0;
+	    uint8_t p1_reg = 0;
     };
 
     class LIBBLUEBERRN_API driver1942 : public berrndriver
@@ -138,15 +132,12 @@ namespace berrn
 	    string drivername();
 	    uint32_t get_flags();
 
-	    double get_framerate();
-
 	    bool drvinit();
 	    void drvshutdown();
 	    void drvrun();
+	    void keychanged(BerrnInput key, bool is_pressed);
 
 	    void process_audio();
-
-	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
 	    Berrn1942Core *core = NULL;
