@@ -19,6 +19,8 @@
 #ifndef BERRN_UTILS_H
 #define BERRN_UTILS_H
 
+#include <iostream>
+#include <string>
 #include <cstdint>
 #include <functional>
 using namespace std;
@@ -26,6 +28,7 @@ using namespace std::placeholders;
 
 namespace berrn
 {
+    using berrncbline = function<void(bool)>;
     using berrncbread8 = function<uint8_t(int)>;
     using berrncbwrite8 = function<void(int, uint8_t)>;
 
@@ -60,11 +63,43 @@ namespace berrn
 	}
     }
 
+    template<typename T, typename U>
+    T bitswap(T val, U bit)
+    {
+	return testbit(val, bit);
+    }
+
+    template<typename T, typename U, typename... V>
+    T bitswap(T val, U bit, V... c)
+    {
+	return (testbit(val, bit) << sizeof...(c)) | bitswap(val, c...);
+    }
+
+    template<uint32_t B, typename T, typename... U>
+    T bitswap(T val, U... bit)
+    {
+	static_assert(sizeof...(bit) == B, "Wrong number of bits");
+	static_assert((sizeof(std::remove_reference_t<T>) * 8) >= B, "Return type too small for result");
+	return bitswap(val, bit...);
+    }
+
     template<typename T>
     bool inRange(T value, int low, int high)
     {
 	int val = int(value);
 	return ((val >= low) && (val < high));
+    }
+
+    template<typename T>
+    bool inRangeEx(T value, int low, int high)
+    {
+	int val = int(value);
+	return ((val >= low) && (val <= high));
+    }
+
+    inline uint32_t convertAddr16(bool lower, uint32_t addr)
+    {
+	return ((addr & ~1) | lower);
     }
 };
 

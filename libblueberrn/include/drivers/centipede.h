@@ -22,65 +22,60 @@
 #include <libblueberrn_api.h>
 #include <driver.h>
 #include <cpu/mos6502.h>
-#include <iostream>
-#include <string>
+#include <machine/er2055.h>
 using namespace berrn;
 using namespace std;
 
 namespace berrn
 {
-    class LIBBLUEBERRN_API CentipedeBase : public BerrnInterface
+    class LIBBLUEBERRN_API BerrnCentipedeBase : public BerrnInterface
     {
 	public:
-	    CentipedeBase(berrndriver &drv);
-	    ~CentipedeBase();
+	    BerrnCentipedeBase(berrndriver &drv);
+	    ~BerrnCentipedeBase();
 
-	    bool init_core();
-	    void shutdown_core();
-	    void run_core();
-
-	    void key_changed(BerrnInput key, bool is_pressed);
+	    bool initcore();
+	    void stopcore();
+	    void runcore();
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
 
-	    virtual bool isValidAddr(uint16_t addr);
+	    virtual bool isValidAddr(uint16_t addr, bool is_write);
 	    virtual uint8_t readMem(uint16_t addr);
 	    virtual void writeMem(uint16_t addr, uint8_t data);
 
-	    void writeLatch(int addr, uint8_t data);
-
 	    virtual void writeLatchUpper(int addr, bool line);
+
+	    void writeLatch(int addr, uint8_t data);
 
 	private:
 	    berrndriver &driver;
-	    BerrnScheduler scheduler;
 
-	    Berrn6502Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
-
-	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *interrupt_timer = NULL;
-
-	    BerrnBitmapRGB *bitmap = NULL;
-
+	    vector<uint8_t> main_rom;
 	    array<uint8_t, 0x400> main_ram;
-
-	    // TODO: Properly implement video hardware
 	    array<uint8_t, 0x400> temp_vram;
+
+	    Berrn6502CPU *main_cpu = NULL;
+
+	    BerrnTimer *irq_timer = NULL;
 
 	    int current_scanline = 0;
 
-	    vector<uint8_t> main_rom;
+	    uint8_t earom_read();
+	    void earom_write(int addr, uint8_t data);
+	    void earom_control_write(uint8_t data);
+
+	    er2055core earom;
     };
 
-    class LIBBLUEBERRN_API CentipedeCore : public CentipedeBase
+    class LIBBLUEBERRN_API BerrnCentipede : public BerrnCentipedeBase
     {
 	public:
-	    CentipedeCore(berrndriver &drv);
-	    ~CentipedeCore();
+	    BerrnCentipede(berrndriver &drv);
+	    ~BerrnCentipede();
 
-	    bool isValidAddr(uint16_t addr);
+	    bool isValidAddr(uint16_t addr, bool is_write);
 	    uint8_t readMem(uint16_t addr);
 	    void writeMem(uint16_t addr, uint8_t data);
 
@@ -94,7 +89,6 @@ namespace berrn
 	    ~drivercentiped();
 
 	    string drivername();
-	    bool hasdriverROMs();
 
 	    bool drvinit();
 	    void drvshutdown();
@@ -103,9 +97,8 @@ namespace berrn
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    CentipedeCore *core = NULL;
+	    BerrnCentipede *core = NULL;
     };
 };
-
 
 #endif // BERRN_CENTIPEDE

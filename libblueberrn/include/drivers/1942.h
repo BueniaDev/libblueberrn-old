@@ -22,9 +22,8 @@
 #include <libblueberrn_api.h>
 #include <driver.h>
 #include <cpu/zilogz80.h>
+#include <audio/ay8910.h>
 #include <video/1942.h>
-#include <iostream>
-#include <string>
 using namespace berrn;
 using namespace std;
 
@@ -38,21 +37,18 @@ namespace berrn
 	    Berrn1942Main(berrndriver &drv, Berrn1942Core &core);
 	    ~Berrn1942Main();
 
-	    bool init();
+	    void init();
 	    void shutdown();
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
-	    uint8_t readOp8(uint16_t addr);
 
 	private:
 	    berrndriver &driver;
-	    Berrn1942Core &parent_core;
+	    Berrn1942Core &main_core;
 
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t data);
-	    vector<uint8_t> cpu_rom;
-	    array<uint8_t, 0x1000> cpu_ram;
+	    vector<uint8_t> main_rom;
+	    array<uint8_t, 0x1000> main_ram;
 
 	    int current_rom_bank = 0;
     };
@@ -63,21 +59,23 @@ namespace berrn
 	    Berrn1942Sound(berrndriver &drv, Berrn1942Core &core);
 	    ~Berrn1942Sound();
 
-	    bool init();
+	    void init();
 	    void shutdown();
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
-	    uint8_t readOp8(uint16_t addr);
+
+	    void processAudio();
 
 	private:
 	    berrndriver &driver;
-	    Berrn1942Core &parent_core;
+	    Berrn1942Core &sound_core;
 
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t data);
-	    vector<uint8_t> cpu_rom;
-	    array<uint8_t, 0x800> cpu_ram;
+	    vector<uint8_t> sound_rom;
+	    array<uint8_t, 0x800> sound_ram;
+
+	    ay8910device *ay1 = NULL;
+	    ay8910device *ay2 = NULL;
     };
 
     class LIBBLUEBERRN_API Berrn1942Core
@@ -87,41 +85,42 @@ namespace berrn
 	    ~Berrn1942Core();
 
 	    bool init_core();
-	    void shutdown_core();
+	    void stop_core();
 	    void run_core();
 	    void key_changed(BerrnInput key, bool is_pressed);
 
-	    void write_graphics_IO(int bank, uint8_t data);
+	    void process_audio();
 
-	    uint8_t read_graphics(int bank, uint16_t addr);
-	    void write_graphics(int bank, uint16_t addr, uint8_t data);
+	    uint8_t readGraphics(int bank, uint16_t addr);
+	    void writeGraphics(int bank, uint16_t addr, uint8_t data);
 
-	    void set_sound_cpu_reset(bool line);
+	    void writeIO(int addr, uint8_t data);
 
-	    uint8_t read_sound_latch();
-	    void write_sound_latch(uint8_t data);
+	    uint8_t readDIP(int reg);
+
+	    uint8_t readSoundLatch();
+	    void writeSoundLatch(uint8_t data);
 
 	private:
 	    berrndriver &driver;
-	    BerrnScheduler scheduler;
-
-	    berrn1942video *video_core = NULL;
 
 	    Berrn1942Main *main_inter = NULL;
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    Berrn1942Sound *sound_inter = NULL;
-	    BerrnZ80Processor *sound_proc = NULL;
-	    BerrnCPU *sound_cpu = NULL;
+	    BerrnZ80CPU *sound_cpu = NULL;
 
-	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *interrupt_timer = NULL;
-	    BerrnBitmapRGB *bitmap = NULL;
+	    berrnscanlinetimer *timer = NULL;
 
-	    int current_scanline = 0;
+	    berrn1942video *video = NULL;
 
-	    uint8_t sound_latch = 0;
+	    void scanline_callback(int vpos);
+
+	    void writeC804(uint8_t data);
+
+	    uint8_t sound_cmd = 0;
+	    uint8_t system_reg = 0;
+	    uint8_t p1_reg = 0;
     };
 
     class LIBBLUEBERRN_API driver1942 : public berrndriver
@@ -131,13 +130,14 @@ namespace berrn
 	    ~driver1942();
 
 	    string drivername();
-	    bool hasdriverROMs();
+	    uint32_t get_flags();
 
 	    bool drvinit();
 	    void drvshutdown();
 	    void drvrun();
-
 	    void keychanged(BerrnInput key, bool is_pressed);
+
+	    void process_audio();
 
 	private:
 	    Berrn1942Core *core = NULL;

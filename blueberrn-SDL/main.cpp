@@ -23,7 +23,6 @@
 #endif
 #include <imgui.h>
 #include <imgui_sdl.h>
-#include <cmixer.h>
 #include <zip.h>
 #include <toml.h>
 #include <iostream>
@@ -107,6 +106,8 @@ class SDL2Frontend : public BlueberrnFrontend
 	    is_xmas_time = is_xmas();
 	    init_config_file();
 
+	    // SDL_setenv("SDL_AUDIODRIVER", "disk", true);
+
 	    isdriverloaded = !core->nocmdarguments();
 	    if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
 	    {
@@ -120,7 +121,7 @@ class SDL2Frontend : public BlueberrnFrontend
 		return sdl_error("Window could not be created!");
 	    }
 						
-	    render = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+	    render = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE | SDL_RENDERER_TARGETTEXTURE);
 				
 	    if (render == NULL)
 	    {
@@ -138,9 +139,6 @@ class SDL2Frontend : public BlueberrnFrontend
 	    {
 		return sdl_error("Could not open audio!");
 	    }
-
-	    cm_init(audiospec.freq);
-	    cm_set_master_gain(0.5);
 
 	    SDL_PauseAudio(!isdriverloaded);
 
@@ -345,6 +343,18 @@ class SDL2Frontend : public BlueberrnFrontend
 			set_current_language(French);
 		    }
 
+		    if (ImGui::MenuItem(u8"Deutsch"))
+		    {
+			cout << "Setting language to German..." << endl;
+			set_current_language(German);
+		    }
+
+		    if (ImGui::MenuItem(u8"Italiano..."))
+		    {
+			cout << "Setting language to Italian..." << endl;
+			set_current_language(Italian);
+		    }
+
 		    ImGui::EndMenu();
 		}
 
@@ -371,6 +381,10 @@ class SDL2Frontend : public BlueberrnFrontend
 			{
 			    case SDL_WINDOWEVENT_SIZE_CHANGED:
 			    {
+				int width = event.window.data1;
+				int height = event.window.data2;
+				iotemp.DisplaySize.x = float(width);
+				iotemp.DisplaySize.y = float(height);
 				SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
 				SDL_RenderClear(render);
 				SDL_RenderPresent(render);
@@ -382,25 +396,40 @@ class SDL2Frontend : public BlueberrnFrontend
 		    case SDL_KEYDOWN:
 		    case SDL_KEYUP:
 		    {
-			// blueberrn-SDL key mappings (similar to MAME):
+			// blueberrn-SDL key mappings:
+			// 2 - Service mode
 			// 5 - Insert credit
 			// 1 - P1 Start
 			// Left - P1 Left
 			// Right - P1 Right
 			// Up - P1 Up
 			// Down - P1 Down
-			// Left Ctrl - P1 Fire
+			// A - P1 Button 1
+			// B = P1 Button 2
+			// C = P1 Button 3
+			// Ctrl+D = Dump (for debugging purposes)
 			bool is_pressed = (event.type == SDL_KEYDOWN);
 
 			switch (event.key.keysym.sym)
 			{
+			    case SDLK_2: core->keychanged(BerrnInput::BerrnService, is_pressed); break;
 			    case SDLK_5: core->keychanged(BerrnInput::BerrnCoin, is_pressed); break;
 			    case SDLK_1: core->keychanged(BerrnInput::BerrnStartP1, is_pressed); break;
 			    case SDLK_LEFT: core->keychanged(BerrnInput::BerrnLeftP1, is_pressed); break;
 			    case SDLK_RIGHT: core->keychanged(BerrnInput::BerrnRightP1, is_pressed); break;
 			    case SDLK_UP: core->keychanged(BerrnInput::BerrnUpP1, is_pressed); break;
 			    case SDLK_DOWN: core->keychanged(BerrnInput::BerrnDownP1, is_pressed); break;
-			    case SDLK_LCTRL: core->keychanged(BerrnInput::BerrnFireP1, is_pressed); break;
+			    case SDLK_a: core->keychanged(BerrnInput::BerrnButton1P1, is_pressed); break;
+			    case SDLK_b: core->keychanged(BerrnInput::BerrnButton2P1, is_pressed); break;
+			    case SDLK_c: core->keychanged(BerrnInput::BerrnButton3P1, is_pressed); break;
+			    case SDLK_d:
+			    {
+				if (isctrlpressed(event))
+				{
+				    core->keychanged(BerrnInput::BerrnDump, is_pressed);
+				}
+			    }
+			    break;
 			}
 		    }
 		    break;
@@ -467,7 +496,6 @@ class SDL2Frontend : public BlueberrnFrontend
 	    }
 
 	    framestarttime = SDL_GetTicks();
-
 	    fpscount += 1;
 
 	    if (((SDL_GetTicks() - fpstime) >= 1000))
@@ -500,8 +528,26 @@ class SDL2Frontend : public BlueberrnFrontend
 				
 	void resize(int w, int h, int s)
 	{
-	    width = w;
-	    height = h;
+	    auto driver = core->getDriver();
+
+	    int rot_flags = 0;
+
+	    if (driver != NULL)
+	    {
+		rot_flags = (driver->get_flags() & berrn_rot_mask);
+	    }
+
+	    if (rot_flags & berrn_swapxy)
+	    {
+		width = h;
+		height = w;
+	    }
+	    else
+	    {
+		width = w;
+		height = h;
+	    }
+
 	    scale = s;
 
 	    resizewindow();
@@ -509,9 +555,10 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	void drawpixels()
 	{
+	    auto driver = core->getDriver();
 	    SDL_RenderClear(render);
 
-	    BerrnBitmap *bitmap = core->getDriver()->getScreen();
+	    BerrnBitmap *bitmap = driver->get_screen_bmp();
 
 	    if (bitmap == NULL)
 	    {
@@ -589,12 +636,10 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	int loadzip(string filename)
 	{
-	    cout << "Loading ZIP file of " << filename << endl;
 	    struct zip_t *zip = zip_open(filename.c_str(), 0, 'r');
 
 	    if (zip == NULL)
 	    {
-		cout << "Error: could not load ZIP file" << endl;
 		return -1;
 	    }
 
@@ -605,26 +650,66 @@ class SDL2Frontend : public BlueberrnFrontend
 	    return id;
 	}
 
-	vector<uint8_t> readfile(string filename)
+	vector<uint8_t> readfile(string dirname, string subdirname, string filename)
 	{
 	    vector<uint8_t> temp;
-	    ifstream file(filename.c_str(), ios::in | ios::binary | ios::ate);
+	    fs::path dir_path = dirname;
 
-	    if (!file.is_open())
+	    vector<fs::path> target_paths = 
 	    {
-		cout << "Unable to load file." << endl;
-		return temp;
+		(dir_path / subdirname / filename),
+		(dir_path / filename),
+	    };
+
+	    for (auto &path : target_paths)
+	    {
+		if (fs::exists(path))
+		{
+		    return loadfile(path.generic_string());
+		}
 	    }
 
-	    streampos size = file.tellg();
-	    temp.resize(size, 0);
-	    file.seekg(0, ios::beg);
-	    file.read((char*)temp.data(), size);
-	    file.close();
+	    auto target_file = fs::path(filename);
+
+	    for (const auto &dir_entry : fs::recursive_directory_iterator(dir_path))
+	    {
+		auto path = dir_entry.path();
+		if (path.filename() == target_file.filename())
+		{
+		    return loadfile(path.generic_string());
+		}
+	    }
+
+	    for (const auto &dir_entry : fs::directory_iterator(dir_path))
+	    {
+		auto path = dir_entry.path();
+		if (path.extension() == target_file.extension())
+		{
+		    return loadfile(path.generic_string());
+		}
+	    }
+
 	    return temp;
 	}
 
-	vector<uint8_t> readfilefromzip(int id, string filename)
+	vector<uint8_t> loadfile(string filename)
+	{
+	    vector<uint8_t> temp;
+	    ifstream file(filename, ios::in | ios::binary | ios::ate);
+
+	    if (file.is_open())
+	    {
+		streampos size = file.tellg();
+		temp.resize(size, 0);
+		file.seekg(0, ios::beg);
+		file.read((char*)temp.data(), temp.size());
+		file.close();
+	    }
+
+	    return temp;
+	}
+
+	vector<uint8_t> readfilefromzip(int id, string dirname, string filename)
 	{
 	    vector<uint8_t> temp;
 
@@ -633,31 +718,113 @@ class SDL2Frontend : public BlueberrnFrontend
 		return temp;
 	    }
 
-	    struct zip_t *zip = zip_files.at(id);
+	    auto zip_file = zip_files.at(id);
+
+	    vector<fs::path> target_paths = 
+	    {
+		(fs::path(dirname) / filename),
+		fs::path(filename),
+	    };
+
+	    for (auto &path : target_paths)
+	    {
+		if (is_zip_exists(zip_file, path))
+		{
+		    return loadfilefromzip(zip_file, path.generic_string());
+		}
+	    }
+
+	    auto target_file = fs::path(filename);
+	    fs::path file_path;
+
+	    if (find_file_in_zip(zip_file, target_file, file_path))
+	    {
+		return loadfilefromzip(zip_file, file_path.generic_string());
+	    }
+
+	    return temp;
+	}
+
+	bool is_zip_exists(struct zip_t *zip, fs::path path)
+	{
+	    if (zip == NULL)
+	    {
+		return false;
+	    }
+
+	    int num_entries = zip_entries_total(zip);
+
+	    for (int i = 0; i < num_entries; i++)
+	    {
+		zip_entry_openbyindex(zip, i);
+		fs::path file_name = fs::path(zip_entry_name(zip));
+		zip_entry_close(zip);
+
+		if (file_name == path)
+		{
+		    return true;
+		}
+	    }
+
+	    return false;
+	}
+
+	bool find_file_in_zip(struct zip_t *zip, fs::path target_path, fs::path &file_path)
+	{
+	    if (zip == NULL)
+	    {
+		return false;
+	    }
+
+	    int num_entries = zip_entries_total(zip);
+
+	    for (int i = 0; i < num_entries; i++)
+	    {
+		zip_entry_openbyindex(zip, i);
+		fs::path file_name = fs::path(zip_entry_name(zip));
+		zip_entry_close(zip);
+
+		if (file_name.filename() == target_path.filename())
+		{
+		    file_path = file_name;
+		    return true;
+		}
+	    }
+
+	    for (int i = 0; i < num_entries; i++)
+	    {
+		zip_entry_openbyindex(zip, i);
+		fs::path file_name = fs::path(zip_entry_name(zip));
+		zip_entry_close(zip);
+
+		if (!file_name.has_parent_path())
+		{
+		    if (file_name.extension() == target_path.extension())
+		    {
+			file_path = file_name;
+			return true;
+		    }
+		}
+	    }
+
+	    return false;
+	}
+
+	vector<uint8_t> loadfilefromzip(struct zip_t *zip, string filename)
+	{
+	    vector<uint8_t> data;
 
 	    if (zip == NULL)
 	    {
-		cout << "Error: ZIP entry is NULL" << endl;
-		return temp;
+		return data;
 	    }
 
-	    int zipentry = zip_entry_open(zip, filename.c_str());
-
-	    if (zipentry < 0)
-	    {
-		cout << "Error: could not open entry in ZIP file" << endl;
-		zip_entry_close(zip);
-		return temp;
-	    }
-
-	    size_t bufsize = zip_entry_size(zip);
-
-	    temp.resize(bufsize, 0);
-
-	    zip_entry_noallocread(zip, temp.data(), temp.size());
-
+	    zip_entry_open(zip, filename.c_str());
+	    size_t buf_size = zip_entry_size(zip);
+	    data.resize(buf_size, 0);
+	    zip_entry_noallocread(zip, (void*)data.data(), data.size());
 	    zip_entry_close(zip);
-	    return temp;
+	    return data;
 	}
 
 	void closezip()
@@ -674,108 +841,13 @@ class SDL2Frontend : public BlueberrnFrontend
 	    zip_files.clear();
 	}
 
-	// Audio logic (samples logic powered by cmixer)
-	// TODO: Make overall audio API more robust
+	// Fetch external sample rate
 	uint32_t getSampleRate()
 	{
 	    return 48000;
 	}
 
-	int loadWAV(string filename)
-	{
-	    int id = samplesounds.size();
-
-	    cm_Source *src = cm_new_source_from_file(filename.c_str());
-
-	    if (src == NULL)
-	    {
-		cout << "Could not load " << filename << "! cm_error: " << cm_get_error() << endl;
-		return -1;
-	    }
-
-	    samplesounds.push_back(src);
-	    return id;
-	}
-
-	bool hasSounds()
-	{
-	    return !samplesounds.empty();
-	}
-
-	bool setSoundLoop(int id, bool is_loop)
-	{
-	    if ((id < 0) || (id >= int(samplesounds.size())))
-	    {
-		return false;
-	    }
-
-	    int loop_val = (is_loop) ? 1 : 0;
-	    cm_set_loop(samplesounds[id], loop_val);
-	    return true;
-	}
-
-	bool playSound(int id)
-	{
-	    if ((id < 0) || (id >= int(samplesounds.size())))
-	    {
-		return false;
-	    }
-
-	    cm_play(samplesounds[id]);
-	    return true;
-	}
-
-	bool stopSound(int id)
-	{
-	    if ((id < 0) || (id >= int(samplesounds.size())))
-	    {
-		return false;
-	    }
-
-	    cm_stop(samplesounds[id]);
-	    return true;
-	}
-
-	bool setSoundVol(int id, double vol)
-	{
-	    if ((id < 0) || (id >= int(samplesounds.size())))
-	    {
-		return false;
-	    }
-
-	    if ((vol < 0.0) || (vol > 1.0))
-	    {
-		return false;
-	    }
-
-	    cm_set_gain(samplesounds[id], vol);
-	    return true;
-	}
-
-	array<int16_t, 2> getMixedSamples()
-	{
-	    array<int16_t, 2> samples;
-	    cm_Int16 dst[2];
-	    cm_process(dst, 2);
-	    samples[0] = dst[0];
-	    samples[1] = dst[1];
-	    return samples;
-	}
-
-	void freeSounds()
-	{
-	    for (int id = 0; id < samplesounds.size(); id++)
-	    {
-		if (samplesounds[id] != NULL)
-		{
-		    cm_destroy_source(samplesounds[id]);
-		    samplesounds[id] = NULL;
-		}
-	    }
-
-	    samplesounds.clear();
-	}
-
+	// External audio callback
 	void audioCallback(array<int16_t, 2> samples)
 	{
 	    int16_t left = samples[0];
@@ -796,6 +868,11 @@ class SDL2Frontend : public BlueberrnFrontend
 		SDL_QueueAudio(1, audiobuffer.data(), (4096 * sizeof(int16_t)));
 	    }
 	}
+
+	bool isctrlpressed(SDL_Event event)
+	{
+	    return (event.key.keysym.mod & KMOD_CTRL) ? true : false;
+	}
 		
 	SDL_Window *window = NULL;
 	SDL_Renderer *render = NULL;
@@ -804,6 +881,8 @@ class SDL2Frontend : public BlueberrnFrontend
 	SDL_Texture *texture = NULL;
 				
 	BlueberrnCore *core = NULL;
+
+	ofstream audio_file;
 
 	bool isdriverloaded = false;
 		
@@ -834,8 +913,6 @@ class SDL2Frontend : public BlueberrnFrontend
 
 	Uint32 framecurrenttime = 0;
 	Uint32 framestarttime = 0;
-
-	vector<cm_Source*> samplesounds;
 
 	vector<int16_t> audiobuffer;
 
@@ -874,6 +951,7 @@ int main(int argc, char* argv[])
 		
     if (!core.startdriver(front->isdriverloaded))
     {
+	cout << "Error: could not load driver" << endl;
 	return 1;
     }
 		

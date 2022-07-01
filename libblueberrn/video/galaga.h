@@ -34,46 +34,34 @@ namespace berrn
 	    galagavideo(berrndriver &drv);
 	    ~galagavideo();
 
-	    bool init();
+	    void init();
 	    void shutdown();
 	    void updatePixels();
 
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t data);
+	    uint8_t readVRAM(uint16_t addr);
+	    void writeVRAM(uint16_t addr, uint8_t data);
 
-	    void writeSprites(int bank, uint16_t addr, uint8_t data);
-
-	    int64_t timeUntilScanline(int scanline);
+	    uint8_t readORAM(int bank, uint16_t addr);
+	    void writeORAM(int bank, uint16_t addr, uint8_t data);
 
 	private:
 	    berrndriver &driver;
 
-	    BerrnBitmapRGB *bitmap = NULL;
-
-	    array<uint8_t, 0x400> vram;
-	    array<uint8_t, 0x400> cram;
-
-	    array<uint8_t, 0x80> obj_ram;
-	    array<uint8_t, 0x80> obj_ram2;
-	    array<uint8_t, 0x80> obj_ram3;
+	    array<uint8_t, 0x400> video_ram;
+	    array<uint8_t, 0x400> color_ram;
+	    array<array<uint8_t, 0x80>, 3> sprite_ram;
 
 	    vector<uint8_t> tile_pal_rom;
-	    vector<uint8_t> sprite_pal_rom;
-	    
-	    vector<uint8_t> col_rom;
-	    vector<uint8_t> tile_rom;
-	    vector<uint8_t> sprite_rom;
+	    vector<uint8_t> color_rom;
 
 	    vector<uint8_t> tile_ram;
-	    vector<uint8_t> sprite_ram;
 
-	    void update_tiles();
-	    void update_sprites();
-
-	    void draw_tile(int tile_num, int pal_num, int xcoord, int ycoord);
-	    void draw_sprite(int sprite_num, int pal_num, int xcoord, int ycoord, bool flipx, bool flipy);
+	    uint32_t tilemap_scan(uint32_t row, uint32_t col);
+	    void draw_tile(uint32_t tile_num, int xcoord, int ycoord, int pal_num);
 
 	    void set_pixel(int xpos, int ypos, uint8_t color_num);
+
+	    BerrnBitmapRGB *bitmap = NULL;
     };
 };
 

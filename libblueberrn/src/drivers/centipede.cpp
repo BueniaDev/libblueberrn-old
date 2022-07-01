@@ -16,39 +16,34 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "centipede.h"
+#include <centipede.h>
 using namespace berrn;
+using namespace std;
+using namespace std::placeholders;
 
 namespace berrn
 {
     berrn_rom_start(centiped)
-	berrn_rom_region("maincpu", 0x10000)
-	    berrn_rom_load("136001-407.d1", 0x2000, 0x0800)
-	    berrn_rom_load("136001-408.e1", 0x2800, 0x0800)
+	berrn_rom_region("maincpu", 0x10000, 0)
+	    berrn_rom_load("136001-407.d1",  0x2000, 0x0800)
+	    berrn_rom_load("136001-408.e1",  0x2800, 0x0800)
 	    berrn_rom_load("136001-409.fh1", 0x3000, 0x0800)
-	    berrn_rom_load("136001-410.j1", 0x3800, 0x0800)
+	    berrn_rom_load("136001-410.j1",  0x3800, 0x0800)
     berrn_rom_end
 
-    CentipedeBase::CentipedeBase(berrndriver &drv) : driver(drv)
+    BerrnCentipedeBase::BerrnCentipedeBase(berrndriver &drv) : driver(drv)
     {
-	main_proc = new Berrn6502Processor(1512000, *this);
-	main_cpu = new BerrnCPU(scheduler, *main_proc);
+	auto &scheduler = driver.get_scheduler();
+	main_cpu = new Berrn6502CPU(driver, 1512000, *this);
 
-	vblank_timer = new BerrnTimer("VBlank", scheduler, [&](int64_t, int64_t)
-	{
-	    driver.setScreen(bitmap);
-	});
-
-	interrupt_timer = new BerrnTimer("IRQ", scheduler, [&](int64_t, int64_t)
+	irq_timer = new BerrnTimer("IRQ", scheduler, [&](int64_t, int64_t)
 	{
 	    current_scanline += 1;
 
-	    if (current_scanline & 16)
+	    if (testbit(current_scanline, 4))
 	    {
-		if ((current_scanline - 1) & 32)
-		{
-		    cout << "Firing IRQ..." << endl;
-		}
+		bool is_irq_line = testbit((current_scanline - 1), 5);
+		main_cpu->fireInterrupt(is_irq_line);
 	    }
 
 	    if (current_scanline == 256)
@@ -56,79 +51,77 @@ namespace berrn
 		current_scanline = 0;
 	    }
 	});
-
-	bitmap = new BerrnBitmapRGB(256, 240);
-	bitmap->clear();
     }
 
-    CentipedeBase::~CentipedeBase()
+    BerrnCentipedeBase::~BerrnCentipedeBase()
     {
 
     }
 
-    bool CentipedeBase::init_core()
+    bool BerrnCentipedeBase::initcore()
     {
-	scheduler.reset();
-	main_proc->init();
-	vblank_timer->start(time_in_hz(60), true);
-	interrupt_timer->start((time_in_hz(60) / 256), true);
-	scheduler.add_device(main_cpu);
+	auto &scheduler = driver.get_scheduler();
 	main_rom = driver.get_rom_region("maincpu");
 	main_ram.fill(0);
 	temp_vram.fill(0);
+	earom_control_write(0x00);
+	main_cpu->fireInterrupt(false);
+	main_cpu->init();
+	scheduler.add_device(main_cpu);
+	// VBlank time / 256
+	irq_timer->start(65, true);
 	driver.resize(640, 480, 1);
 	return true;
     }
 
-    void CentipedeBase::shutdown_core()
+    void BerrnCentipedeBase::stopcore()
     {
-	vblank_timer->stop();
-	interrupt_timer->stop();
-	main_proc->shutdown();
-	scheduler.shutdown();
+	main_rom.clear();
+	main_cpu->shutdown();
     }
 
-    void CentipedeBase::run_core()
+    void BerrnCentipedeBase::runcore()
     {
-	int64_t schedule_time = scheduler.get_current_time();
-	int64_t frame_time = time_in_hz(60);
-
-	while (scheduler.get_current_time() < (schedule_time + frame_time))
-	{
-	    scheduler.timeslice();
-	}
+	driver.run_scheduler();
     }
 
-    void CentipedeBase::key_changed(BerrnInput key, bool is_pressed)
+    uint8_t BerrnCentipedeBase::readCPU8(uint16_t addr)
     {
-	(void)key;
-	(void)is_pressed;
-	return;
-    }
-
-    uint8_t CentipedeBase::readCPU8(uint16_t addr)
-    {
-	addr &= 0x3FFF;
 	uint8_t data = 0;
+	addr &= 0x3FFF;
 
-	if (inRange(addr, 0, 0x400))
+	if (inRange(addr, 0x0000, 0x0400))
 	{
 	    data = main_ram.at(addr);
 	}
-	else if (inRange(addr, 0x400, 0x800))
+	else if (inRange(addr, 0x0400, 0x0800))
 	{
-	    data = temp_vram.at((addr & 0x3FF));
+	    data = temp_vram.at(addr - 0x400);
 	}
-	else if (addr == 0xC00)
+	else if (addr == 0x0800)
+	{
+	    // DSW1
+	    data = 0x54;
+	}
+	else if (addr == 0x0801)
+	{
+	    // DSW2
+	    data = 0x02;
+	}
+	else if (addr == 0x0C00)
 	{
 	    // TODO: IN0 reads
 	    data = 0xBF;
+	}
+	else if (inRange(addr, 0x1700, 0x1740))
+	{
+	    data = earom_read();
 	}
 	else if (inRange(addr, 0x2000, 0x4000))
 	{
 	    data = main_rom.at(addr);
 	}
-	else if (isValidAddr(addr))
+	else if (isValidAddr(addr, false))
 	{
 	    data = readMem(addr);
 	}
@@ -140,26 +133,35 @@ namespace berrn
 	return data;
     }
 
-    void CentipedeBase::writeCPU8(uint16_t addr, uint8_t data)
+    void BerrnCentipedeBase::writeCPU8(uint16_t addr, uint8_t data)
     {
 	addr &= 0x3FFF;
-	if (inRange(addr, 0, 0x400))
+
+	if (inRange(addr, 0x0000, 0x0400))
 	{
 	    main_ram.at(addr) = data;
 	}
-	else if (inRange(addr, 0x400, 0x800))
+	else if (inRange(addr, 0x0400, 0x0800))
 	{
-	    temp_vram.at((addr & 0x3FF)) = data;
+	    temp_vram.at(addr - 0x400) = data;
+	}
+	else if (inRange(addr, 0x1600, 0x1640))
+	{
+	    earom_write(addr, data);
+	}
+	else if (addr == 0x1680)
+	{
+	    earom_control_write(data);
 	}
 	else if (inRange(addr, 0x1C00, 0x1C08))
 	{
-	    writeLatch((addr & 7), data);
+	    writeLatch(addr, data);
 	}
 	else if (inRange(addr, 0x2000, 0x4000))
 	{
 	    return;
 	}
-	else if (isValidAddr(addr))
+	else if (isValidAddr(addr, true))
 	{
 	    writeMem(addr, data);
 	}
@@ -169,26 +171,48 @@ namespace berrn
 	}
     }
 
-    bool CentipedeBase::isValidAddr(uint16_t addr)
+    uint8_t BerrnCentipedeBase::earom_read()
+    {
+	// EAROM read
+	return earom.data();
+    }
+
+    void BerrnCentipedeBase::earom_write(int addr, uint8_t data)
+    {
+	// EAROM write
+	earom.set_address(addr & 0x3F);
+	earom.set_data(data);
+    }
+
+    void BerrnCentipedeBase::earom_control_write(uint8_t data)
+    {
+	// EAROM control write
+	// CK = DB0, C1 = /DB1, C2 = DB2, CS1 = DB3, /CS2 = GND
+	earom.set_control(testbit(data, 3), true, !testbit(data, 1), testbit(data, 2));
+	earom.set_clk(testbit(data, 0));
+    }
+
+    bool BerrnCentipedeBase::isValidAddr(uint16_t addr, bool is_write)
     {
 	(void)addr;
+	(void)is_write;
 	return false;
     }
 
-    uint8_t CentipedeBase::readMem(uint16_t addr)
+    uint8_t BerrnCentipedeBase::readMem(uint16_t addr)
     {
 	(void)addr;
 	return 0;
     }
 
-    void CentipedeBase::writeMem(uint16_t addr, uint8_t data)
+    void BerrnCentipedeBase::writeMem(uint16_t addr, uint8_t data)
     {
 	(void)addr;
 	(void)data;
 	return;
     }
 
-    void CentipedeBase::writeLatch(int addr, uint8_t data)
+    void BerrnCentipedeBase::writeLatch(int addr, uint8_t data)
     {
 	addr &= 7;
 	bool line = testbit(data, 7);
@@ -204,30 +228,31 @@ namespace berrn
 	}
     }
 
-    void CentipedeBase::writeLatchUpper(int addr, bool line)
+    void BerrnCentipedeBase::writeLatchUpper(int addr, bool line)
     {
 	(void)addr;
 	(void)line;
 	return;
     }
 
-    CentipedeCore::CentipedeCore(berrndriver &drv) : CentipedeBase(drv)
+    BerrnCentipede::BerrnCentipede(berrndriver &drv) : BerrnCentipedeBase(drv)
     {
 
     }
 
-    CentipedeCore::~CentipedeCore()
+    BerrnCentipede::~BerrnCentipede()
     {
 
     }
 
-    bool CentipedeCore::isValidAddr(uint16_t addr)
+    bool BerrnCentipede::isValidAddr(uint16_t addr, bool is_write)
     {
+	(void)is_write;
 	addr &= 0x3FFF;
 	return inRange(addr, 0x1000, 0x1010);
     }
 
-    uint8_t CentipedeCore::readMem(uint16_t addr)
+    uint8_t BerrnCentipede::readMem(uint16_t addr)
     {
 	uint8_t data = 0;
 	addr &= 0x3FFF;
@@ -235,7 +260,6 @@ namespace berrn
 	if (inRange(addr, 0x1000, 0x1010))
 	{
 	    cout << "Reading value from Pokey address of " << hex << int(addr & 0xF) << endl;
-	    exit(0);
 	    data = 0;
 	}
 	else
@@ -246,7 +270,7 @@ namespace berrn
 	return data;
     }
 
-    void CentipedeCore::writeMem(uint16_t addr, uint8_t data)
+    void BerrnCentipede::writeMem(uint16_t addr, uint8_t data)
     {
 	addr &= 0x3FFF;
 	if (inRange(addr, 0x1000, 0x1010))
@@ -259,7 +283,7 @@ namespace berrn
 	}
     }
 
-    void CentipedeCore::writeLatchUpper(int addr, bool line)
+    void BerrnCentipede::writeLatchUpper(int addr, bool line)
     {
 	switch (addr)
 	{
@@ -281,7 +305,7 @@ namespace berrn
 
     drivercentiped::drivercentiped()
     {
-	core = new CentipedeCore(*this);
+	core = new BerrnCentipede(*this);
     }
 
     drivercentiped::~drivercentiped()
@@ -294,11 +318,6 @@ namespace berrn
 	return "centiped";
     }
 
-    bool drivercentiped::hasdriverROMs()
-    {
-	return true;
-    }
-
     bool drivercentiped::drvinit()
     {
 	if (!loadROM(berrn_rom_name(centiped)))
@@ -306,21 +325,61 @@ namespace berrn
 	    return false;
 	}
 
-	return core->init_core();
+	return core->initcore();
     }
 
     void drivercentiped::drvshutdown()
     {
-	core->shutdown_core();
+	core->stopcore();
     }
   
     void drivercentiped::drvrun()
     {
-	core->run_core();
+	core->runcore();
     }
 
     void drivercentiped::keychanged(BerrnInput key, bool is_pressed)
     {
-	core->key_changed(key, is_pressed);
+	string key_state = (is_pressed) ? "pressed" : "released";
+
+	switch (key)
+	{
+	    case BerrnInput::BerrnCoin:
+	    {
+		cout << "Coin button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnStartP1:
+	    {
+		cout << "P1 start button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnLeftP1:
+	    {
+		cout << "P1 left button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnRightP1:
+	    {
+		cout << "P1 right button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnUpP1:
+	    {
+		cout << "P1 up button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnDownP1:
+	    {
+		cout << "P1 down button has been " << key_state << endl;
+	    }
+	    break;
+	    case BerrnInput::BerrnButton1P1:
+	    {
+		cout << "P1 button 1 has been " << key_state << endl;
+	    }
+	    break;
+	    default: break;
+	}
     }
 };

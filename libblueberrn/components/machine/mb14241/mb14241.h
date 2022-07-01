@@ -25,26 +25,38 @@ using namespace std;
 
 namespace mb14241
 {
-    struct mb14241shifter
+    class mb14241shifter
     {
-	int shiftoffs = 0;
-	uint16_t shiftval = 0;
+	public:
+	    mb14241shifter() : shiftoffs(0), shiftval(0)
+	    {
 
-	void setshiftoffs(uint8_t val)
-	{
-	    shiftoffs = (val & 0x07);
-	}
+	    }
 
-	void fillshiftreg(uint8_t val)
-	{
-	    shiftval >>= 8;
-	    shiftval |= (val << 8);
-	}
+	    ~mb14241shifter()
+	    {
 
-	uint8_t readshiftresult()
-	{
-	    return (shiftval >> (8 - shiftoffs));
-	}
+	    }
+
+	    void setshiftoffs(uint8_t val)
+	    {
+		shiftoffs = (val & 0x07);
+	    }
+
+	    void fillshiftreg(uint8_t val)
+	    {
+		shiftval >>= 8;
+		shiftval |= (val << 8);
+	    }
+
+	    uint8_t readshiftresult()
+	    {
+		return (shiftval >> (8 - shiftoffs));
+	    }
+
+	private:
+	    int shiftoffs = 0;
+	    uint16_t shiftval = 0;
     };
 };
 

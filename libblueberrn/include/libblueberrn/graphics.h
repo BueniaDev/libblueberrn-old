@@ -24,13 +24,25 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <cassert>
 #include <bitset>
+#include <chrono>
 #include <utils.h>
 #include <libblueberrn_api.h>
 using namespace std;
 
 namespace berrn
 {
+    #define berrn_swapxy (1 << 2)
+    #define berrn_flipy (1 << 1)
+    #define berrn_flipx (1 << 0)
+
+    #define berrn_rot_mask  0x7
+    #define berrn_rot_0     0
+    #define berrn_rot_90    (berrn_swapxy | berrn_flipy)
+    #define berrn_rot_180   (berrn_flipx | berrn_flipy)
+    #define berrn_rot_270   (berrn_swapxy | berrn_flipx)
+
     struct berrnRGBA
     {
 	union
@@ -47,7 +59,7 @@ namespace berrn
 	    uint32_t val;
 	};
 
-	berrnRGBA() : val(0)
+	berrnRGBA() : red(0), green(0), blue(0), alpha(255)
 	{
 
 	}
@@ -64,10 +76,9 @@ namespace berrn
 
 	uint8_t& at(int index)
 	{
-	    if (index >= 4)
+	    if ((index < 0) || (index >= 4))
 	    {
-		cout << "Error: Color index out of bounds" << endl;
-		exit(0);
+		throw out_of_range("Color index out of bounds");
 	    }
 
 	    return raw[index];
@@ -75,7 +86,7 @@ namespace berrn
 
 	uint8_t& operator[](int index)
 	{
-	    return at(index);
+	    return raw[index];
 	}
 
 	berrnRGBA &operator =(const berrnRGBA &c)
@@ -86,6 +97,45 @@ namespace berrn
 	    }
 
 	    return *this;
+	}
+
+	berrnRGBA &operator +(const berrnRGBA &c)
+	{
+	    red = clamp<uint8_t>((red + c.red), 0, 255);
+	    green = clamp<uint8_t>((green + c.green), 0, 255);
+	    blue = clamp<uint8_t>((blue + c.blue), 0, 255);
+	    return *this;
+	}
+
+	berrnRGBA &operator +=(const berrnRGBA &c)
+	{
+	    return (*this + c);
+	}
+
+	berrnRGBA &operator -(const berrnRGBA &c)
+	{
+	    red = clamp<uint8_t>((red - c.red), 0, 255);
+	    green = clamp<uint8_t>((green - c.green), 0, 255);
+	    blue = clamp<uint8_t>((blue - c.blue), 0, 255);
+	    return *this;
+	}
+
+	berrnRGBA &operator -=(const berrnRGBA &c)
+	{
+	    return (*this - c);
+	}
+
+	berrnRGBA &operator *(const float value)
+	{
+	    red = clamp<uint8_t>((red * value), 0, 255);
+	    green = clamp<uint8_t>((green * value), 0, 255);
+	    blue = clamp<uint8_t>((blue * value), 0, 255);
+	    return *this;
+	}
+
+	berrnRGBA &operator *=(const float value)
+	{
+	    return (*this * value);
 	}
     };
 	
@@ -151,6 +201,284 @@ namespace berrn
 	return berrnRGBA(red, green, blue, alpha);
     }
 
+    enum BerrnPaletteFormat
+    {
+	R8G8B8,
+	R8G8B8A8,
+	XBGR_555,
+	XBGR_444
+    };
+
+    class BerrnPalette
+    {
+	public:
+	    BerrnPalette(BerrnPaletteFormat format, size_t num_entries, size_t num_bytes, bool is_big_endian = false) : format_(format), num_entries_(num_entries), num_bytes_(num_bytes), is_big_endian_(is_big_endian)
+	    {
+		palette_ram.resize(numBytes(), 0);
+		colors.resize(numEntries(), black());
+	    }
+
+	    virtual ~BerrnPalette()
+	    {
+		colors.clear();
+		palette_ram.clear();
+	    }
+
+	    BerrnPaletteFormat format() const
+	    {
+		return format_;
+	    }
+
+	    size_t numEntries() const
+	    {
+		return num_entries_;
+	    }
+
+	    size_t numBytes() const
+	    {
+		return (numEntries() * numBytesPerEntry());
+	    }
+
+	    bool isBigEndian() const
+	    {
+		return is_big_endian_;
+	    }
+
+	    uint8_t read8(size_t offs)
+	    {
+		if (!inRange(offs, 0, numBytes()))
+		{
+		    return 0;
+		}
+
+		return palette_ram.at(offs);
+	    }
+
+	    void write8(size_t offs, uint8_t data)
+	    {
+		if (!inRange(offs, 0, numBytes()))
+		{
+		    return;
+		}
+
+		palette_ram.at(offs) = data;
+		updateColor(offs);
+	    }
+
+	    uint16_t read16(bool upper, bool lower, uint32_t addr)
+	    {
+		uint16_t data = 0;
+
+		if (upper)
+		{
+		    data |= (read8(addr) << 8);
+		}
+
+		if (lower)
+		{
+		    data |= read8(addr + 1);
+		}
+
+		return data;
+	    }
+
+	    void write16(bool upper, bool lower, uint32_t addr, uint16_t data)
+	    {
+		if (upper)
+		{
+		    write8(addr, (data >> 8));
+		}
+
+		if (lower)
+		{
+		    write8((addr + 1), (data & 0xFF));
+		}
+	    }
+
+	    size_t numBytesPerEntry() const
+	    {
+		return num_bytes_;
+	    }
+
+	    berrnRGBA getColor(size_t offs)
+	    {
+		if (!inRange(offs, 0, numEntries()))
+		{
+		    stringstream ss;
+		    ss << "Invalid palette entry offset of " << dec << offs;
+		    throw out_of_range(ss.str());
+		}
+
+		return colors.at(offs);
+	    }
+
+	    void clear()
+	    {
+		fill(palette_ram.begin(), palette_ram.end(), 0);
+		fill(colors.begin(), colors.end(), black());
+	    }
+
+	protected:
+	    uint16_t read16BE(size_t offs)
+	    {
+		uint8_t high = read8(offs);
+		uint8_t low = read8(offs + 1);
+
+		return ((high << 8) | low);
+	    }
+
+	    uint16_t read16LE(size_t offs)
+	    {
+		uint8_t high = read8(offs + 1);
+		uint8_t low = read8(offs);
+
+		return ((high << 8) | low);
+	    }
+
+	    virtual berrnRGBA convertColor(size_t offs) = 0;
+
+	private:
+	    BerrnPaletteFormat format_;
+	    size_t num_entries_;
+	    size_t num_bytes_;
+	    bool is_big_endian_;
+
+	    void updateColor(size_t offs)
+	    {
+		if (numBytesPerEntry() == 0)
+		{
+		    throw out_of_range("Invalid number of bytes per entry");
+		}
+
+		size_t entry_offs = (offs / numBytesPerEntry());
+		colors.at(entry_offs) = convertColor(entry_offs);
+	    }
+
+	    vector<uint8_t> palette_ram;
+	    vector<berrnRGBA> colors;
+    };
+
+    class BerrnPaletteR8G8B8 : public BerrnPalette
+    {
+	public:
+	    BerrnPaletteR8G8B8(size_t num_entries) : BerrnPalette(R8G8B8, num_entries, 3)
+	    {
+
+	    }
+
+	    ~BerrnPaletteR8G8B8()
+	    {
+
+	    }
+
+	    berrnRGBA convertColor(size_t offs)
+	    {
+		if (!inRange(offs, 0, numEntries()))
+		{
+		    return black();
+		}
+
+		size_t color_offs = (offs * 3);
+
+		int red = read8(color_offs);
+		int green = read8(color_offs + 1);
+		int blue = read8(color_offs + 2);
+
+		return fromRGB(red, green, blue);
+	    }
+    };
+
+    class BerrnPaletteR8G8B8A8 : public BerrnPalette
+    {
+	public:
+	    BerrnPaletteR8G8B8A8(size_t num_entries) : BerrnPalette(R8G8B8A8, num_entries, 4)
+	    {
+
+	    }
+
+	    ~BerrnPaletteR8G8B8A8()
+	    {
+
+	    }
+
+	    berrnRGBA convertColor(size_t offs)
+	    {
+		if (!inRange(offs, 0, numEntries()))
+		{
+		    return black();
+		}
+
+		size_t color_offs = (offs * 4);
+
+		int red = read8(color_offs);
+		int green = read8(color_offs + 1);
+		int blue = read8(color_offs + 2);
+		int alpha = read8(color_offs + 3);
+
+		return fromRGBA(red, green, blue, alpha);
+	    }
+    };
+
+    class BerrnPaletteXBGR555 : public BerrnPalette
+    {
+	public:
+	    BerrnPaletteXBGR555(size_t num_entries, bool is_big_endian = false) : BerrnPalette(XBGR_555, num_entries, 2, is_big_endian)
+	    {
+
+	    }
+
+	    berrnRGBA convertColor(size_t offs)
+	    {
+		if (!inRange(offs, 0, numEntries()))
+		{
+		    return black();
+		}
+
+		size_t pal_offs = (offs * 2);
+		uint16_t color_val = (isBigEndian() ? read16BE(pal_offs) : read16LE(pal_offs));
+
+		int red_val = (color_val & 0x1F);
+		int green_val = ((color_val >> 5) & 0x1F);
+		int blue_val = ((color_val >> 10) & 0x1F);
+
+		int red = ((red_val << 3) | (red_val >> 2));
+		int green = ((green_val << 3) | (green_val >> 2));
+		int blue = ((blue_val << 3) | (blue_val >> 2));
+
+		return fromRGB(red, green, blue);
+	    }
+    };
+
+    class BerrnPaletteXBGR444 : public BerrnPalette
+    {
+	public:
+	    BerrnPaletteXBGR444(size_t num_entries, bool is_big_endian = false) : BerrnPalette(XBGR_444, num_entries, 2, is_big_endian)
+	    {
+
+	    }
+
+	    berrnRGBA convertColor(size_t offs)
+	    {
+		if (!inRange(offs, 0, numEntries()))
+		{
+		    return black();
+		}
+
+		size_t pal_offs = (offs * 2);
+		uint16_t color_val = (isBigEndian() ? read16BE(pal_offs) : read16LE(pal_offs));
+
+		int red_val = (color_val & 0xF);
+		int green_val = ((color_val >> 4) & 0xF);
+		int blue_val = ((color_val >> 8) & 0xF);
+
+		int red = ((red_val << 4) | red_val);
+		int green = ((green_val << 4) | green_val);
+		int blue = ((blue_val << 4) | blue_val);
+
+		return fromRGB(red, green, blue);
+	    }
+    };
+
     enum BerrnBitmapFormat
     {
 	BerrnRGB
@@ -204,6 +532,11 @@ namespace berrn
 		framebuffer.resize((width * height), black());
 	    }
 
+	    ~BerrnBitmapRGB()
+	    {
+		framebuffer.clear();
+	    }
+
 	    berrnRGBA pixel(int x, int y)
 	    {
 		berrnRGBA color = black();
@@ -248,74 +581,184 @@ namespace berrn
 	    vector<berrnRGBA> framebuffer;
     };
 
+    inline BerrnBitmap* rotateBitmapRGB(BerrnBitmapRGB *bmp, int rot_flags)
+    {
+	if (bmp == NULL)
+	{
+	    return NULL;
+	}
+
+	int bmp_width = bmp->width();
+	int bmp_height = bmp->height();
+
+	int width = bmp_width;
+	int height = bmp_height;
+
+	bool is_swapxy = (rot_flags & berrn_swapxy);
+
+	if (rot_flags & berrn_swapxy)
+	{
+	    swap(width, height);
+	}
+
+	bool is_flipx = (rot_flags & berrn_flipx);
+	bool is_flipy = (rot_flags & berrn_flipy);
+
+	BerrnBitmapRGB *bitmap = new BerrnBitmapRGB(width, height);
+	bitmap->clear();
+
+	int bmp_w = (bmp_width - 1);
+	int bmp_h = (bmp_height - 1);
+
+	for (int x = 0; x < bmp_width; x++)
+	{
+	    int xpos = is_flipx ? (bmp_w - x) : x;
+	    for (int y = 0; y < bmp_height; y++)
+	    {
+		int ypos = is_flipy ? (bmp_h - y) : y;
+
+		berrnRGBA pixel = bmp->pixel(x, y);
+
+		if (is_swapxy)
+		{
+		    bitmap->setPixel(ypos, xpos, pixel);
+		}
+		else
+		{
+		    bitmap->setPixel(xpos, ypos, pixel);
+		}
+	    }
+	}
+
+	return bitmap;
+    }
+
+    #define berrn_rgn_frac(num, den) (0x80000000 | (((num) & 0xF) << 27) | (((den) & 0xF) << 23))
+
+    #define is_berrn_frac(offs) testbit((offs), 31)
+    #define berrn_frac_num(offs) (((offs) >> 27) & 0xF)
+    #define berrn_frac_den(offs) (((offs) >> 23) & 0xF)
+    #define berrn_frac_offset(offs) ((offs) & 0x7FFFFF)
+
     #define gfx_step2(start, step) start, (start + step)
     #define gfx_step4(start, step) gfx_step2(start, step), gfx_step2((start + (2 * step)), step)
     #define gfx_step8(start, step) gfx_step4(start, step), gfx_step4((start + (4 * step)), step)
     #define gfx_step16(start, step) gfx_step8(start, step), gfx_step8((start + (8 * step)), step)
+    #define gfx_step32(start, step) gfx_step16(start, step), gfx_step16((start + (16 * step)), step)
 
     struct BerrnGfxLayout
     {
 	int width; // Width of a tile (in pixels)
 	int height; // Height of a tile (in pixels)
-	int num_tiles; // Number of total tiles
+	uint32_t num_tiles; // Number of total tiles
 	int num_planes; // Number of bit planes
-	array<int, 4> plane_offs; // Offset of bit planes (in bits)
-	array<int, 16> x_offs; // Offset of pixel x-coordinate in bits relative to one bitplane (in bits)
-	array<int, 16> y_offs; // Offset of pixel y-coordinate in bits relative to one bitplane (in bits)
+	array<uint32_t, 4> plane_offs; // Offset of bit planes (in bits)
+	array<uint32_t, 32> x_offs; // Offset of pixel x-coordinate in bits relative to one bitplane (in bits)
+	array<uint32_t, 32> y_offs; // Offset of pixel y-coordinate in bits relative to one bitplane (in bits)
 	int delta; // Length of an individual tile (in bits)
     };
 
-    inline void gfxDecodeChar(BerrnGfxLayout &layout, vector<uint8_t> src, vector<uint8_t> &dst, int offset_bits, int dst_offs)
+    class BerrnGfx
     {
-	for (int ypos = 0; ypos < layout.height; ypos++)
-	{
-	    for (int xpos = 0; xpos < layout.width; xpos++)
+	public:
+	    BerrnGfx()
 	    {
-		uint32_t base_offs = (layout.y_offs[ypos] + layout.x_offs[xpos] + offset_bits);
 
-		uint8_t video_byte = 0;
+	    }
 
-		for (int plane = 0; plane < layout.num_planes; plane++)
+	    ~BerrnGfx()
+	    {
+		gfx_data.clear();
+	    }
+
+	    void setLayout(BerrnGfxLayout &layout, vector<uint8_t> src)
+	    {
+		gfx_layout = layout;
+		gfx_rom = src;
+
+		size_t region_length = (src.size() * 8);
+
+		if (is_berrn_frac(gfx_layout.num_tiles))
 		{
-		    int plane_bit = ((layout.num_planes - 1) - plane);
-		    uint32_t bit_offs = (base_offs + layout.plane_offs[plane]);
+		    assert(region_length != 0);
+		    gfx_layout.num_tiles = ((region_length / gfx_layout.delta) * berrn_frac_num(gfx_layout.num_tiles) / berrn_frac_den(gfx_layout.num_tiles));
+		}
 
-		    uint32_t byte_num = (bit_offs / 8);
-		    int bit_num = (7 - (bit_offs % 8));
-
-		    if (testbit(src[byte_num], bit_num))
+		for (int i = 0; i < gfx_layout.num_planes; i++)
+		{
+		    uint32_t value = gfx_layout.plane_offs.at(i);
+		    if (is_berrn_frac(value))
 		    {
-			video_byte = setbit(video_byte, plane_bit);
+			assert(region_length != 0);
+			gfx_layout.plane_offs.at(i) = (berrn_frac_offset(value) + (region_length * berrn_frac_num(value) / berrn_frac_den(value)));
 		    }
 		}
 
-		int index = (xpos + (ypos * layout.width));
-		dst[dst_offs + index] = video_byte;
+		line_mod = gfx_layout.width;
+		char_mod = (line_mod * gfx_layout.height);
+		gfx_data.resize((gfx_layout.num_tiles * char_mod), 0);
 	    }
-	}
-    }
+
+	    void decode()
+	    {
+		for (uint32_t i = 0; i < gfx_layout.num_tiles; i++)
+		{
+		    decode_tile(i);
+		}
+	    }
+
+	    vector<uint8_t> get_gfx_data()
+	    {
+		return gfx_data;
+	    }
+
+	private:
+	    BerrnGfxLayout gfx_layout;
+	    vector<uint8_t> gfx_rom;
+	    vector<uint8_t> gfx_data;
+
+	    uint32_t line_mod = 0;
+	    uint32_t char_mod = 0;
+
+	    void decode_tile(int tile_num)
+	    {
+		uint32_t base_offs = (tile_num * char_mod);
+
+		int plane_bit = (gfx_layout.num_planes - 1);
+		for (int plane = 0; plane < gfx_layout.num_planes; plane++, plane_bit--)
+		{
+		    int plane_offs = (tile_num * gfx_layout.delta + gfx_layout.plane_offs[plane]);
+
+		    for (int ypos = 0; ypos < gfx_layout.height; ypos++)
+		    {
+			int yoffset = (plane_offs + gfx_layout.y_offs[ypos]);
+			uint32_t decode_offs = (base_offs + ypos * line_mod);
+
+			for (int xpos = 0; xpos < gfx_layout.width; xpos++)
+			{
+			    uint32_t final_offs = (yoffset + gfx_layout.x_offs[xpos]);
+
+			    uint32_t byte_num = (final_offs / 8);
+			    int bit_num = (7 - (final_offs % 8));
+
+			    if (testbit(gfx_rom[byte_num], bit_num))
+			    {
+				uint32_t bit_offs = (decode_offs + xpos);
+				gfx_data[bit_offs] = setbit(gfx_data[bit_offs], plane_bit);
+			    }
+			}
+		    }
+		}
+	    }
+    };
 
     inline void gfxDecodeSet(BerrnGfxLayout &layout, vector<uint8_t> src, vector<uint8_t> &dst)
     {
-	int offset_bits = 0;
-	int buf_delta = (layout.width * layout.height);
-	int dst_offs = 0;
-
-	for (int i = 0; i < layout.num_tiles; i++)
-	{
-	    gfxDecodeChar(layout, src, dst, offset_bits, dst_offs);
-	    offset_bits += layout.delta;
-	    dst_offs += buf_delta;
-	}
+	BerrnGfx gfx_tiles;
+	gfx_tiles.setLayout(layout, src);
+	gfx_tiles.decode();
+	dst = gfx_tiles.get_gfx_data();
     }
-
-    enum BerrnRotation : int
-    {
-	None = 0,
-	Rot90 = 1,
-	Rot180 = 2,
-	Rot270 = 3,
-    };
 };
 
 #endif // BERRN_GFX_H

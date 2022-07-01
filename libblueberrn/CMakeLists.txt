@@ -3,18 +3,56 @@ add_subdirectory(machine)
 add_subdirectory(video)
 add_subdirectory(audio)
 
-set(LIBBLUEBERRN
-	libblueberrn/src/core/libblueberrn.cpp
-	libblueberrn/src/core/scheduler.cpp
+set(DRIVER_SOURCES
 	libblueberrn/src/drivers/example.cpp
 	libblueberrn/src/drivers/invaders.cpp
 	libblueberrn/src/drivers/galaxian.cpp
 	libblueberrn/src/drivers/pacman.cpp
 	libblueberrn/src/drivers/galaga.cpp
+	libblueberrn/src/drivers/bosco.cpp
 	libblueberrn/src/drivers/system1.cpp
 	libblueberrn/src/drivers/rastan.cpp
 	libblueberrn/src/drivers/centipede.cpp
 	libblueberrn/src/drivers/1942.cpp
+	libblueberrn/src/drivers/1943.cpp
+	libblueberrn/src/drivers/tmnt.cpp
+	libblueberrn/src/drivers/mia.cpp
+	libblueberrn/src/drivers/punkshot.cpp
+	libblueberrn/src/drivers/xmen.cpp
+	libblueberrn/src/drivers/cave.cpp
+	libblueberrn/src/drivers/konmedal.cpp
+	libblueberrn/src/drivers/aliens.cpp
+	libblueberrn/src/drivers/blockhole.cpp
+	libblueberrn/src/drivers/bombjack.cpp
+	libblueberrn/src/drivers/gradius.cpp)
+
+set(DRIVER_HEADERS
+	libblueberrn/include/drivers/example.h
+	libblueberrn/include/drivers/invaders.h
+	libblueberrn/include/drivers/galaxian.h
+	libblueberrn/include/drivers/pacman.h
+	libblueberrn/include/drivers/galaga.h
+	libblueberrn/include/drivers/bosco.h
+	libblueberrn/include/drivers/system1.h
+	libblueberrn/include/drivers/rastan.h
+	libblueberrn/include/drivers/centipede.h
+	libblueberrn/include/drivers/1942.h
+	libblueberrn/include/drivers/1943.h
+	libblueberrn/include/drivers/tmnt.h
+	libblueberrn/include/drivers/mia.h
+	libblueberrn/include/drivers/punkshot.h
+	libblueberrn/include/drivers/xmen.h
+	libblueberrn/include/drivers/cave.h
+	libblueberrn/include/drivers/konmedal.h
+	libblueberrn/include/drivers/aliens.h
+	libblueberrn/include/drivers/blockhole.h
+	libblueberrn/include/drivers/bombjack.h
+	libblueberrn/include/drivers/gradius.h)
+
+set(LIBBLUEBERRN
+	libblueberrn/src/core/libblueberrn.cpp
+	libblueberrn/src/core/scheduler.cpp
+	${DRIVER_SOURCES}
 	${MACHINE_SOURCES}
 	${VIDEO_SOURCES}
 	${AUDIO_SOURCES}
@@ -23,21 +61,14 @@ set(LIBBLUEBERRN
 set(LIBBLUEBERRN_HEADERS
 	libblueberrn/include/libblueberrn/libblueberrn_api.h
 	libblueberrn/include/libblueberrn/utils.h
+	libblueberrn/include/libblueberrn/berrnfile.h
 	libblueberrn/include/libblueberrn/graphics.h
 	libblueberrn/include/libblueberrn/driver.h
 	libblueberrn/include/libblueberrn/scheduler.h
 	libblueberrn/include/libblueberrn/driverlist.h
 	libblueberrn/include/libblueberrn/libblueberrn.h
 	libblueberrn/include/drivers/berrndrivers.h
-	libblueberrn/include/drivers/example.h
-	libblueberrn/include/drivers/invaders.h
-	libblueberrn/include/drivers/galaxian.h
-	libblueberrn/include/drivers/pacman.h
-	libblueberrn/include/drivers/galaga.h
-	libblueberrn/include/drivers/system1.h
-	libblueberrn/include/drivers/rastan.h
-	libblueberrn/include/drivers/centipede.h
-	libblueberrn/include/drivers/1942.h
+	${DRIVER_HEADERS}
 	${MACHINE_HEADERS}
 	${VIDEO_HEADERS}
 	${AUDIO_HEADERS}

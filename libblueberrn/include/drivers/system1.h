@@ -16,29 +16,24 @@
     along with libblueberrn.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef BERRN_SEGASYS1
-#define BERRN_SEGASYS1
+#ifndef BERRN_SYS1
+#define BERRN_SYS1
 
 #include <libblueberrn_api.h>
 #include <driver.h>
 #include <cpu/zilogz80.h>
 #include <machine/i8255.h>
-#include <iostream>
-#include <string>
-#include <functional>
 using namespace berrn;
 using namespace std;
-using namespace std::placeholders;
 
 namespace berrn
 {
-    using sys1inputfunc = function<uint8_t(int)>;
-    using sys1outputfunc = function<void(int, uint8_t)>;
-    // Interface for the main CPU
+    class SegaSystem1;
+
     class LIBBLUEBERRN_API Sys1MainInterface : public BerrnInterface
     {
 	public:
-	    Sys1MainInterface();
+	    Sys1MainInterface(berrndriver &drv, SegaSystem1 &core);
 	    ~Sys1MainInterface();
 
 	    void init();
@@ -46,101 +41,71 @@ namespace berrn
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
-	    uint8_t readOp8(uint16_t addr);
 	    uint8_t portIn(uint16_t port);
 	    void portOut(uint16_t port, uint8_t data);
 
-	    vector<uint8_t> &get_gamerom()
-	    {
-		return gamerom;
-	    }
-
-	    vector<uint8_t> &get_lookup_prom()
-	    {
-		return lookup_prom;
-	    }
-
-	    void setinputcallback(sys1inputfunc cb)
-	    {
-		inputcb = cb;
-	    }
-
-	    void setoutputcallback(sys1outputfunc cb)
-	    {
-		outputcb = cb;
-	    }
-
-	    BerrnBitmap *getBitmap()
-	    {
-		return framebitmap;
-	    }
-
-	    void updatePixels();
-	    void writeVideoMode(uint8_t data);
-
 	private:
-	    uint8_t readByte(uint16_t addr);
+	    berrndriver &driver;
+	    SegaSystem1 &main_core;
 
-	    vector<uint8_t> gamerom;
-	    vector<uint8_t> lookup_prom;
-	    array<uint8_t, 0x1000> mainram;
-	    array<uint8_t, 0x1000> vram;
-	    array<uint8_t, 0x800> pram;
-	    array<uint8_t, 0x800> oam;
+	    vector<uint8_t> main_rom;
+	    array<uint8_t, 0x1000> main_ram;
 
-	    sys1inputfunc inputcb;
-	    sys1outputfunc outputcb;
+	    // TODO: Implement video system
+	    array<uint8_t, 0x1000> video_ram;
 
-	    BerrnBitmapRGB *framebitmap = NULL;
+	    array<uint8_t, 0x800> sprite_ram;
 
-	    bool is_screen_blank = false;
+	    array<uint8_t, 0x800> palette_ram;
     };
 
-    // Core logic for the Sega System 1 hardware
-    class LIBBLUEBERRN_API SegaSys1PPI
+    class LIBBLUEBERRN_API SegaSystem1
     {
 	public:
-	    SegaSys1PPI();
-	    ~SegaSys1PPI();
+	    SegaSystem1(berrndriver &drv);
+	    ~SegaSystem1();
 
-	    void init();
-	    void shutdown();
-	    void run();
+	    virtual bool init_core();
+	    virtual void stop_core();
+	    void run_core();
 
-	    vector<uint8_t> &get_main_rom()
-	    {
-		return main_inter.get_gamerom();
-	    }
+	    virtual uint8_t portIn(uint16_t addr);
+	    virtual void portOut(uint16_t addr, uint8_t data);
 
-	    vector<uint8_t> &get_lookup_prom()
-	    {
-		return main_inter.get_lookup_prom();
-	    }
-
-	    BerrnBitmap *getBitmap()
-	    {
-		return main_inter.getBitmap();
-	    }
+	    virtual uint8_t readDIP(int bank);
 
 	private:
-	    Sys1MainInterface main_inter;
-	    BerrnScheduler scheduler;
+	    berrndriver &driver;
+	    Sys1MainInterface *main_inter = NULL;
+
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *interrupt_timer = NULL;
+    };
 
-	    array<berrnRGBA, (512 * 224)> framebuffer;
+    class LIBBLUEBERRN_API SegaSys1PPI : public SegaSystem1
+    {
+	public:
+	    SegaSys1PPI(berrndriver &drv);
+	    ~SegaSys1PPI();
 
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    bool init_core();
+	    void stop_core();
 
-	    uint8_t readInput(int addr);
-	    void writeOutput(int addr, uint8_t data);
-	    void interruptHandler(int param);
+	    uint8_t portIn(uint16_t addr);
+	    void portOut(uint16_t addr, uint8_t data);
 
-	    void writeVideoMode(uint8_t data);
-
+	private:
 	    i8255ppi main_ppi;
+    };
+
+    class LIBBLUEBERRN_API WonderBoyCore : public SegaSys1PPI
+    {
+	public:
+	    WonderBoyCore(berrndriver &drv);
+	    ~WonderBoyCore();
+
+	    uint8_t readDIP(int bank);
     };
 
     class LIBBLUEBERRN_API driverwboy2u : public berrndriver
@@ -150,7 +115,7 @@ namespace berrn
 	    ~driverwboy2u();
 
 	    string drivername();
-	    bool hasdriverROMs();
+	    string parentname();
 
 	    bool drvinit();
 	    void drvshutdown();
@@ -159,11 +124,8 @@ namespace berrn
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    SegaSys1PPI core_sys1;
-
-	    void loadROMs();
+	    WonderBoyCore *core = NULL;
     };
 };
 
-
-#endif // BERRN_SEGASYS1
+#endif // BERRN_SYS1

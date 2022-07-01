@@ -24,61 +24,38 @@
 #include <cpu/zilogz80.h>
 #include <video/pacman.h>
 #include <audio/wsg.h>
-#include <iostream>
-#include <string>
 using namespace berrn;
-using namespace namcowsg;
 using namespace std;
 
 namespace berrn
 {
-    class LIBBLUEBERRN_API PacmanInterface : public BerrnInterface
+    class LIBBLUEBERRN_API PacmanCore : public BerrnInterface
     {
 	public:
-	    PacmanInterface(berrndriver &drv);
-	    ~PacmanInterface();
+	    PacmanCore(berrndriver &drv);
+	    ~PacmanCore();
 
 	    bool init_core();
-	    void shutdown_core();
+	    void stop_core();
 	    void run_core();
-
 	    void key_changed(BerrnInput key, bool is_pressed);
+	    void process_audio();
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
-	    uint8_t readOp8(uint16_t addr);
 	    void portOut(uint16_t port, uint8_t data);
 
 	private:
 	    berrndriver &driver;
+	    BerrnZ80CPU *main_cpu = NULL;
 
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t data);
+	    void writeLatch(int addr, bool line);
 
-	    uint8_t readUpper(uint16_t addr);
-	    void writeUpper(uint16_t addr, uint8_t data);
+	    uint8_t readIO(uint16_t addr);
+	    void writeIO(uint16_t addr, uint8_t data);
 
-	    void writeIO(int addr, uint8_t data);
-
-	    void writePort(uint16_t port, uint8_t data);
-
-	    void update_pixels();
-
-	    BerrnScheduler scheduler;
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
-
-	    BerrnTimer *interrupt_timer = NULL;
-	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *sound_timer = NULL;
-
-	    pacmanvideo *video_core = NULL;
-
-	    vector<uint8_t> game_rom;
-
-	    array<uint8_t, 0x3F0> ram;
-
-	    wsg3device *audio_chip = NULL;
+	    vector<uint8_t> main_rom;
+	    array<uint8_t, 0x3F0> main_ram;
 
 	    bool is_irq_enabled = false;
 
@@ -87,10 +64,11 @@ namespace berrn
 	    uint8_t port0_val = 0;
 	    uint8_t port1_val = 0;
 
-	    // TODO: Implement core audio resampling functionality
-	    float out_time = 0.0f;
-	    float in_time = 0.0f;
-	    float out_step = 0.0f;
+	    pacmanvideo *video = NULL;
+
+	    wsg3device *audio_chip = NULL;
+
+	    BerrnTimer *vblank_timer = NULL;
     };
 
     class LIBBLUEBERRN_API driverpacman : public berrndriver
@@ -100,20 +78,19 @@ namespace berrn
 	    ~driverpacman();
 
 	    string drivername();
-	    bool hasdriverROMs();
+	    string parentname();
+	    uint32_t get_flags();
 
 	    bool drvinit();
 	    void drvshutdown();
 	    void drvrun();
 
-	    float get_framerate();
-
 	    void keychanged(BerrnInput key, bool is_pressed);
+	    void process_audio();
 
 	private:
-	    PacmanInterface *inter = NULL;
+	    PacmanCore *core = NULL;
     };
 };
-
 
 #endif // BERRN_PACMAN

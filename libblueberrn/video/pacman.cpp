@@ -46,7 +46,7 @@ namespace berrn
 
     pacmanvideo::pacmanvideo(berrndriver &drv) : driver(drv)
     {
-	bitmap = new BerrnBitmapRGB(224, 288);
+	bitmap = new BerrnBitmapRGB(288, 224);
 	bitmap->clear();
     }
 
@@ -55,96 +55,162 @@ namespace berrn
 
     }
 
-    bool pacmanvideo::init()
+    void pacmanvideo::init()
     {
-	col_rom = driver.get_rom_region("color");
+	color_rom = driver.get_rom_region("color");
 	pal_rom = driver.get_rom_region("pal");
-	tile_rom = driver.get_rom_region("gfx1");
-	sprite_rom = driver.get_rom_region("gfx2");
+	auto tile_rom = driver.get_rom_region("gfx1");
+	auto sprite_rom = driver.get_rom_region("gfx2");
+
 	tile_ram.resize((256 * 8 * 8), 0);
 	sprite_ram.resize((64 * 16 * 16), 0);
 
 	gfxDecodeSet(charlayout, tile_rom, tile_ram);
 	gfxDecodeSet(spritelayout, sprite_rom, sprite_ram);
 
-	vram.fill(0);
-	cram.fill(0);
-	obj_ram.fill(0);
-	obj_pos.fill(0);
-	return true;
+	video_ram.fill(0);
+	color_ram.fill(0);
+	obj_ram[0].fill(0);
+	obj_ram[1].fill(0);
     }
 
     void pacmanvideo::shutdown()
     {
 	bitmap->clear();
+	tile_ram.clear();
+	sprite_ram.clear();
+    }
+
+    uint32_t pacmanvideo::tilemap_scan(uint32_t row, uint32_t col)
+    {
+	uint32_t offs = 0;
+
+	row += 2;
+	col -= 2;
+
+	if (testbit(col, 5))
+	{
+	    offs = row + ((col & 0x1F) * 32);
+	}
+	else
+	{
+	    offs = col + (row * 32);
+	}
+
+	return offs;
     }
 
     void pacmanvideo::updatePixels()
     {
-	update_tiles();
-	update_sprites();
-	driver.setScreen(bitmap);
-    }
+	// Draw tiles
 
-    void pacmanvideo::update_tiles()
-    {
-	for (int addr = 0; addr < 64; addr++)
+	for (int col = 0; col < 36; col++)
 	{
-	    int ypos = (34 + (addr / 32));
-	    int xpos = (31 - (addr % 32));
+	    for (int row = 0; row < 28; row++)
+	    {
+		uint32_t offset = tilemap_scan(row, col);
+		uint8_t tile_number = video_ram.at(offset);
+		uint8_t color_number = (color_ram.at(offset) & 0x3F);
 
-	    uint8_t tile_num = vram[addr];
-	    uint8_t pal_num = cram[addr];
-	    draw_tile(tile_num, pal_num, xpos, ypos);
+		int xpos = (col * 8);
+		int ypos = (row * 8);
+		draw_tile(tile_number, xpos, ypos, color_number);
+	    }
 	}
 
-	for (int addr = 0; addr < 0x380; addr++)
-	{
-	    int ypos = (2 + (addr % 32));
-	    int xpos = (29 - (addr / 32));
-
-	    uint8_t tile_num = vram[(0x40 + addr)];
-	    uint8_t pal_num = cram[(0x40 + addr)];
-	    draw_tile(tile_num, pal_num, xpos, ypos);
-	}
-
-	for (int addr = 0; addr < 64; addr++)
-	{
-	    int ypos = (addr / 32);
-	    int xpos = (31 - (addr % 32));
-
-	    uint8_t tile_num = vram[(0x3C0 + addr)];
-	    uint8_t pal_num = cram[(0x3C0 + addr)];
-	    draw_tile(tile_num, pal_num, xpos, ypos);
-	}
-    }
-
-    void pacmanvideo::update_sprites()
-    {
 	for (int sprite = 7; sprite >= 0; sprite--)
 	{
-	    int16_t xpos = (224 - obj_pos[(sprite * 2)] + 15);
-	    int16_t ypos = (288 - obj_pos[((sprite * 2) + 1)] - 16);
+	    int ypos = (obj_ram[1][(sprite * 2)] - 31);
+	    int xpos = (272 - obj_ram[1][((sprite * 2) + 1)]);
 
-	    uint8_t sprite_info = obj_ram[(sprite * 2)];
-	    uint8_t pal_num = obj_ram[((sprite * 2) + 1)];
+	    uint8_t sprite_info = obj_ram[0][(sprite * 2)];
+	    uint8_t pal_num = obj_ram[0][((sprite * 2) + 1)];
 
-	    bool xflip = testbit(sprite_info, 1);
-	    bool yflip = testbit(sprite_info, 0);
+	    bool xflip = testbit(sprite_info, 0);
+	    bool yflip = testbit(sprite_info, 1);
 
 	    uint8_t sprite_num = (sprite_info >> 2);
-	    draw_sprite(sprite_num, pal_num, xpos, ypos, xflip, yflip);
+	    draw_sprite(sprite_num, xpos, ypos, pal_num, xflip, yflip);
+	}
+
+	driver.set_screen_bmp(bitmap);
+    }
+
+    void pacmanvideo::draw_tile(uint32_t tile_num, int xcoord, int ycoord, int pal_num)
+    {
+	if (!inRange(xcoord, 0, 288) || !inRange(ycoord, 0, 224))
+	{
+	    return;
+	}
+
+	int base_x = xcoord;
+	int base_y = ycoord;
+
+	for (int pixel = 0; pixel < 64; pixel++)
+	{
+	    int py = (pixel / 8);
+	    int px = (pixel % 8);
+
+	    uint8_t color_num = tile_ram.at((tile_num * 64) + pixel);
+	    int xpos = (base_x + px);
+	    int ypos = (base_y + py);
+
+	    uint8_t color = pal_rom.at((pal_num * 4) + color_num);
+	    set_pixel(xpos, ypos, color);
+	}
+    }
+
+    void pacmanvideo::draw_sprite(uint32_t sprite_num, int xcoord, int ycoord, int pal_num, bool flipx, bool flipy)
+    {
+	if (!inRange(ycoord, -16, 224))
+	{
+	    return;
+	}
+
+	pal_num &= 0x3F;
+
+	int base_x = xcoord;
+	int base_y = ycoord;
+
+	for (int pixel = 0; pixel < 256; pixel++)
+	{
+	    int py = (pixel / 16);
+	    int px = (pixel % 16);
+
+	    if (flipx)
+	    {
+		px = (15 - px);
+	    }
+
+	    if (flipy)
+	    {
+		py = (15 - py);
+	    }
+
+	    int xpos = (base_x + px);
+	    int ypos = (base_y + py);
+
+	    if (!inRange(ypos, 0, 224))
+	    {
+		continue;
+	    }
+
+	    uint8_t color_num = sprite_ram.at(((sprite_num * 256) + pixel));
+
+	    uint8_t color = pal_rom.at(((pal_num * 4) + color_num));
+
+	    if (color == 0)
+	    {
+		continue;
+	    }
+
+	    set_pixel(xpos, ypos, color);
 	}
     }
 
     void pacmanvideo::set_pixel(int xpos, int ypos, uint8_t color_num)
     {
-	if (!inRange(xpos, 0, 224) || !inRange(ypos, 0, 288))
-	{
-	    return;
-	}
-
-	uint8_t color = col_rom[color_num];
+	uint8_t color = color_rom.at(color_num);
 
 	bool red0 = testbit(color, 0);
 	bool red1 = testbit(color, 1);
@@ -164,124 +230,50 @@ namespace berrn
 	bitmap->setPixel(xpos, ypos, fromRGB(red, green, blue));
     }
 
-    void pacmanvideo::draw_tile(int tile_num, int pal_num, int xcoord, int ycoord)
-    {
-	int base_x = ((xcoord - 2) * 8);
-	int base_y = (ycoord * 8);
-	int pal_offs = (pal_num & 0x3F);
-
-	if (!inRange(base_x, 0, 224))
-	{
-	    return;
-	}
-
-	for (int pixel = 0; pixel < 64; pixel++)
-	{
-	    int py = (pixel % 8);
-	    int px = (7 - (pixel / 8));
-
-	    uint8_t color_num = tile_ram[((tile_num * 64) + pixel)];
-	    int xpos = (base_x + px);
-	    int ypos = (base_y + py);
-	    uint8_t color = pal_rom[((pal_offs * 4) + color_num)];
-	    set_pixel(xpos, ypos, color);
-	}
-    }
-
-    void pacmanvideo::draw_sprite(int sprite_num, int pal_num, int xcoord, int ycoord, bool flipx, bool flipy)
-    {
-	if (!inRange(xcoord, -16, 224))
-	{
-	    return;
-	}
-
-	int pal_offs = (pal_num & 0x3F);
-
-	int base_x = xcoord;
-	int base_y = ycoord;
-
-	for (int pixel = 0; pixel < 256; pixel++)
-	{
-	    int py = (pixel % 16);
-	    int px = (15 - (pixel / 16));
-
-	    if (flipx)
-	    {
-		px = (15 - px);
-	    }
-
-	    if (flipy)
-	    {
-		py = (15 - py);
-	    }
-
-	    int xpos = (base_x + px);
-	    int ypos = (base_y + py);
-
-	    if (!inRange(xpos, 0, 224))
-	    {
-		continue;
-	    }
-
-	    uint8_t color_num = sprite_ram[((sprite_num * 256) + pixel)];
-
-	    uint8_t color = pal_rom[((pal_offs * 4) + color_num)];
-
-	    if (color == 0)
-	    {
-		continue;
-	    }
-
-	    set_pixel(xpos, ypos, color);
-	}
-    }
-
-    uint8_t pacmanvideo::readByte(uint16_t addr)
+    uint8_t pacmanvideo::readVRAM(uint16_t addr)
     {
 	uint8_t data = 0;
 	addr &= 0x7FF;
 
 	if (addr < 0x400)
 	{
-	    data = vram[(addr & 0x3FF)];
+	    data = video_ram.at(addr);
 	}
 	else
 	{
-	    data = cram[(addr & 0x3FF)];
+	    data = color_ram.at(addr & 0x3FF);
 	}
 
 	return data;
     }
 
-    void pacmanvideo::writeByte(uint16_t addr, uint8_t data)
+    void pacmanvideo::writeVRAM(uint16_t addr, uint8_t data)
     {
 	addr &= 0x7FF;
-
 	if (addr < 0x400)
 	{
-	    vram[(addr & 0x3FF)] = data;
+	    video_ram.at(addr) = data;
 	}
 	else
 	{
-	    cram[(addr & 0x3FF)] = data;
+	    color_ram.at(addr & 0x3FF) = data;
 	}
     }
 
-    uint8_t pacmanvideo::readSprites(int addr)
+    uint8_t pacmanvideo::readORAM(uint16_t addr)
     {
 	addr &= 0xF;
-	return obj_ram[addr];
+	return obj_ram[0][addr];
     }
 
-    void pacmanvideo::writeSprites(int addr, uint8_t data)
+    void pacmanvideo::writeORAM(int bank, uint16_t addr, uint8_t data)
     {
-	addr &= 0xF;
-	obj_ram[addr] = data;
-    }
+	if (!inRange(bank, 0, 2))
+	{
+	    throw out_of_range("Invalid sprite RAM bank");
+	}
 
-    void pacmanvideo::writeSpritePos(int addr, uint8_t data)
-    {
 	addr &= 0xF;
-	obj_pos[addr] = data;
+	obj_ram[bank][addr] = data;
     }
 };

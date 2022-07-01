@@ -23,6 +23,7 @@
 #include <driver.h>
 #include <iostream>
 #include <string>
+#include <audio/samples.h>
 using namespace berrn;
 using namespace std;
 
@@ -35,7 +36,6 @@ namespace berrn
 	    ~driverexample();
 
 	    string drivername();
-	    bool hasdriverROMs();
 
 	    bool drvinit();
 	    void drvshutdown();
@@ -46,11 +46,11 @@ namespace berrn
 	private:
 	    int sample_val = 0;
 
-	    BerrnBitmapRGB *bitmap = NULL;
-	    BerrnScheduler scheduler;
-	    BerrnTimer *sound_timer = NULL;
-
 	    BerrnNull *device = NULL;
+	    samplesdevice *audio = NULL;
+
+	    void process_audio();
+	    BerrnBitmapRGB *bitmap = NULL;
     };
 };
 

@@ -21,59 +21,43 @@
 
 #include <libblueberrn_api.h>
 #include <driver.h>
-#include <cpu/zilogz80.h>
-#include <video/galaxian.h>
 #include <iostream>
 #include <string>
+#include <cpu/zilogz80.h>
+#include <video/galaxian.h>
 using namespace berrn;
 using namespace std;
 
 namespace berrn
 {
-    class LIBBLUEBERRN_API GalaxianInterface : public BerrnInterface
+    class LIBBLUEBERRN_API GalaxianCore : public BerrnInterface
     {
 	public:
-	    GalaxianInterface(berrndriver &drv);
-	    ~GalaxianInterface();
+	    GalaxianCore(berrndriver &drv);
+	    ~GalaxianCore();
 
-	    bool init_core();
-	    void shutdown_core();
-	    void run_core();
-
-	    void key_changed(BerrnInput key, bool is_pressed);
+	    bool initcore();
+	    void stopcore();
+	    void runcore();
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
-	    uint8_t readOp8(uint16_t addr);
 
 	private:
 	    berrndriver &driver;
 
-	    vector<uint8_t> game_rom;
+	    vector<uint8_t> main_rom;
+	    array<uint8_t, 0x400> main_ram;
 
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t data);
+	    void writeIOUpper(int reg, bool line);
 
-	    void write_lowerIO(int addr, uint8_t data);
-	    void write_upperIO(int addr, uint8_t data);
+	    bool irq_enable = false;
 
-	    BerrnScheduler scheduler;
-	    BerrnZ80Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
+	    BerrnZ80CPU *main_cpu = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *interrupt_timer = NULL;
 
-	    void update_pixels();
-
-	    galaxianvideo *video_core = NULL;
-
-	    array<uint8_t, 0x400> ram;
-
-	    bool is_int_enabled = false;
-
-	    uint8_t port0_val = 0;
-	    uint8_t port1_val = 0;
+	    galaxianvideo *video = NULL;
     };
 
     class LIBBLUEBERRN_API drivergalaxian : public berrndriver
@@ -83,18 +67,16 @@ namespace berrn
 	    ~drivergalaxian();
 
 	    string drivername();
-	    bool hasdriverROMs();
+	    uint32_t get_flags();
 
 	    bool drvinit();
 	    void drvshutdown();
 	    void drvrun();
 
-	    float get_framerate();
-
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    GalaxianInterface *inter = NULL;
+	    GalaxianCore *core = NULL;
     };
 };
 

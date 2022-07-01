@@ -28,6 +28,7 @@
 #include <bitset>
 #include <functional>
 #include <utils.h>
+#include <berrnfile.h>
 #include <scheduler.h>
 #include <graphics.h>
 #include <libblueberrn_api.h>
@@ -36,7 +37,7 @@ using namespace std;
 using namespace std::placeholders;
 
 namespace berrn
-{	
+{
     class LIBBLUEBERRN_API BlueberrnFrontend
     {
 	public:
@@ -56,18 +57,10 @@ namespace berrn
 	    virtual void resize(int width, int height, int scale) = 0;
 	    virtual void drawpixels() = 0;
 	    virtual int loadzip(string filename) = 0;
-	    virtual vector<uint8_t> readfile(string filename) = 0;
-	    virtual vector<uint8_t> readfilefromzip(int id, string filename) = 0;
+	    virtual vector<uint8_t> readfile(string dirname, string subdir_name, string filename) = 0;
+	    virtual vector<uint8_t> readfilefromzip(int id, string dirname, string filename) = 0;
 	    virtual void closezip() = 0;
 	    virtual uint32_t getSampleRate() = 0;
-	    virtual int loadWAV(string filename) = 0;
-	    virtual bool hasSounds() = 0;
-	    virtual bool setSoundLoop(int id, bool is_loop) = 0;
-	    virtual bool playSound(int id) = 0;
-	    virtual bool stopSound(int id) = 0;
-	    virtual bool setSoundVol(int id, double vol) = 0;
-	    virtual array<int16_t, 2> getMixedSamples() = 0;
-	    virtual void freeSounds() = 0;
 	    virtual void audioCallback(array<int16_t, 2> samples) = 0;
     };
 
@@ -79,8 +72,28 @@ namespace berrn
 	BerrnRightP1,
 	BerrnUpP1,
 	BerrnDownP1,
-	BerrnFireP1,
+	BerrnButton1P1,
+	BerrnButton2P1,
+	BerrnButton3P1,
+	BerrnService,
+	BerrnDump,
     };
+
+    #define berrn_rom_erasemask    0x2000
+    #define berrn_rom_erase        0x2000
+    #define berrn_rom_erasevalmask 0x00FF0000
+    #define berrn_rom_eraseval(x)  ((((x) & 0xFF) << 16) | berrn_rom_erase)
+    #define berrn_rom_eraseff      berrn_rom_eraseval(0xFF)
+    #define berrn_rom_erase00      berrn_rom_eraseval(0x00)
+
+    #define berrn_is_erase      ((entry.flags & berrn_rom_erasemask) == berrn_rom_erase)
+    #define berrn_get_erase_val ((entry.flags & berrn_rom_erasevalmask) >> 16)
+
+    #define berrn_rom_groupmask  0x0F00
+    #define berrn_rom_group_size(n)  ((((n) - 1) & 15) << 8)
+    #define berrn_rom_group_byte     berrn_rom_group_size(1)
+    #define berrn_rom_group_word     berrn_rom_group_size(2)
+    #define berrn_get_group_size()   ((entry.flags & berrn_rom_groupmask) >> 8)
 
     #define berrn_rom_skipmask   0xF000
     #define berrn_rom_skip(n)    (((n) & 15) << 12)
@@ -104,9 +117,11 @@ namespace berrn
 
     #define berrn_rom_name(name) rom_##name
     #define berrn_rom_start(name) static vector<berrnROMregion> berrn_rom_name(name) = { {"", #name, 0, 0, 0, true}, 
-    #define berrn_rom_region(tag, length) {tag, "", length, 0, 0, false},
+    #define berrn_rom_region(tag, length, flags) {tag, "", length, 0, flags, false},
     #define berrn_rom_load(filename, offs, length) {"", filename, offs, length, 0, false},
     #define berrn_rom_load16_byte(filename, offs, length) {"", filename, offs, length, berrn_rom_skip(1), false},
+    #define berrn_rom_load32_byte(filename, offs, length) {"", filename, offs, length, berrn_rom_skip(3), false},
+    #define berrn_rom_load32_word(filename, offs, length) {"", filename, offs, length, berrn_rom_group_word | berrn_rom_skip(2), false},
     #define berrn_rom_end {"", "", 0, 0, 0, false}};
 
     class LIBBLUEBERRN_API berrnROM
@@ -137,12 +152,8 @@ namespace berrn
 		return temp;
 	    }
 
-	    bool loadROM(vector<berrnROMregion> entries)
+	    bool loadROM(vector<berrnROMregion> entries, string parent_name)
 	    {
-		bool is_roms_zipped = false;
-
-		string directory_name;
-
 		auto entry_zero = entries.at(0);
 
 		if (!entry_zero.is_directory)
@@ -151,26 +162,43 @@ namespace berrn
 		    return false;
 		}
 
-		directory_name = get_path("roms", entry_zero.filename);
+		vector<string> dir_names = {entry_zero.filename, parent_name};
 
-		is_roms_zipped = !is_rom_dir(directory_name);
+		is_dir_found = false;
+		is_zip_found = false;
+		string directory_name = "";
+		string zip_name = "";
 
-		int zip_id = -1;
-
-		if (is_roms_zipped)
+		for (auto &dir_name : dir_names)
 		{
-		    zip_id = load_zip(directory_name);
-
-		    if (zip_id == -1)
+		    if (dir_name.empty())
 		    {
-			return false;
+			continue;
 		    }
 
-		    is_zip_loaded = true;
+		    directory_name = get_path("roms", dir_name);
+		    stringstream zip_name_stream;
+		    zip_name_stream << directory_name << ".zip";
+		    zip_name = zip_name_stream.str();
+
+		    if (is_exists(directory_name) && is_rom_dir(directory_name))
+		    {
+			is_dir_found = true;
+			break;
+		    }
+		    else if (is_exists(zip_name) && !is_rom_dir(zip_name))
+		    {
+			is_zip_found = true;
+			break;
+		    }
+		}
+
+		if (!is_dir_found && !is_zip_found)
+		{
+		    return false;
 		}
 
 		bool is_all_files_loaded = true;
-
 		berrnmemoryregion *mem_region = NULL;
 
 		for (size_t index = 1; index < entries.size(); index++)
@@ -185,26 +213,34 @@ namespace berrn
 		    {
 			if (entry.filename.empty() && (entry.length == 0))
 			{
+			    uint8_t value = 0;
+
+			    if (berrn_is_erase)
+			    {
+				value = berrn_get_erase_val;
+			    }
+
 			    mem_region = new berrnmemoryregion();
 			    mem_region->tagname = entry.tagname;
-			    mem_region->data.resize(entry.offset, 0);
+			    mem_region->data.resize(entry.offset, value);
 			    memory_regions.push_back(mem_region);
 			}
 			else
 			{
 			    vector<uint8_t> file_vec;
-			    if (is_roms_zipped)
+
+			    if (is_dir_found)
 			    {
-				file_vec = load_file_from_zip(zip_id, entry.filename);
+				file_vec = load_file(directory_name, entry_zero.filename, entry.filename);
 			    }
-			    else
+			    else if (is_zip_found)
 			    {
-				file_vec = load_file(directory_name, entry.filename);
+				file_vec = load_file_from_zip(zip_name, entry_zero.filename, entry.filename);
 			    }
 
 			    if (file_vec.empty())
 			    {
-				cout << "Error: Could not load file" << endl;
+				cout << "Error: Could not load file of " << entry.filename << endl;
 				mem_region = NULL;
 				memory_regions.clear();
 				is_all_files_loaded = false;
@@ -212,8 +248,9 @@ namespace berrn
 			    }
 
 			    size_t skip_bytes = berrn_get_skip();
+			    size_t group_bytes = berrn_get_group_size();
 
-			    if (skip_bytes == 0)
+			    if ((skip_bytes == 0) && (group_bytes == 0))
 			    {
 				auto databegin = file_vec.begin();
 			    	auto dataend = (file_vec.begin() + entry.length);
@@ -222,16 +259,26 @@ namespace berrn
 			    }
 			    else
 			    {
-				size_t skip_offs = (1 + skip_bytes);
+				size_t group_offs = (1 + group_bytes);
+				size_t skip_offs = (skip_bytes + group_offs);
 				size_t base_offs = entry.offset;
 
-				for (size_t i = 0; i < entry.length; i++, base_offs += skip_offs)
+				for (size_t i = 0; i < entry.length; i += group_offs, base_offs += skip_offs)
 				{
-				    mem_region->data[base_offs] = file_vec[i];
+				    for (size_t j = 0; j < group_offs; j++)
+				    {
+					mem_region->data.at(base_offs + j) = file_vec.at(i + j);
+				    }
 				}
 			    }
 			}
 		    }
+		}
+
+		if (is_zip_loaded)
+		{
+		    close_zip_internal();
+		    is_zip_loaded = false;
 		}
 
 		return is_all_files_loaded;
@@ -246,14 +293,6 @@ namespace berrn
 		}
 
 		memory_regions.clear();
-
-		if (is_zip_loaded)
-		{
-		    if (front != NULL)
-		    {
-			front->closezip();
-		    }
-		}
 	    }
 
 	private:
@@ -265,7 +304,29 @@ namespace berrn
 
 		cur_path.append(subdir);
 		cur_path.append(romPath);
-		return cur_path.string();
+
+		return cur_path.generic_string();
+	    }
+
+	    string get_zip_path(const string subdir, const string romPath)
+	    {
+		fs::path zip_path;
+		zip_path.append(subdir);
+		zip_path.append(romPath);
+		return zip_path.generic_string();
+	    }
+
+	    string get_zip_path(const string romPath)
+	    {
+		fs::path zip_path;
+		zip_path.append(romPath);
+		return zip_path.generic_string();
+	    }
+
+	    bool is_exists(string path_name)
+	    {
+		fs::path path = path_name;
+		return fs::exists(path);
 	    }
 
 	    bool is_rom_dir(string dirname)
@@ -274,97 +335,86 @@ namespace berrn
 		return fs::is_directory(path);
 	    }
 
-	    int load_zip(string zipdir)
+	    bool is_file_exists(string file_name)
 	    {
-		if (front == NULL)
-		{
-		    return -1;
-		}
-
-		stringstream zip_str;
-		zip_str << zipdir << ".zip";
-		return front->loadzip(zip_str.str());
+		return (is_exists(file_name) && !is_rom_dir(file_name));
 	    }
 
-	    vector<uint8_t> load_file(string dirname, string filename)
+	    vector<uint8_t> load_file(string dir_name, string subdir_name, string rom_name)
 	    {
-		vector<uint8_t> file_vec;
+		string dir_path = get_path(dir_name);
+		vector<uint8_t> data = load_file_internal(dir_name, subdir_name, rom_name);
 
-		string full_filename = get_path(dirname, filename);
+		return data;
+	    }
+
+	    vector<uint8_t> load_file_from_zip(string zip_name, string subdir_name, string rom_name)
+	    {
+		vector<uint8_t> data;
+		if (!is_zip_loaded)
+		{
+		    zip_id = load_zip_internal(zip_name);
+
+		    if (zip_id == -1)
+		    {
+			return data;
+		    }
+
+		    is_zip_loaded = true;
+		}
+
+		data = read_file_zip_internal(zip_id, subdir_name, rom_name);
+
+		return data;
+	    }
+
+	    vector<uint8_t> load_file_internal(string dirname, string subdirname, string filename)
+	    {
+		vector<uint8_t> data;
 
 		if (front != NULL)
 		{
-		    file_vec = front->readfile(full_filename);
+		    data = front->readfile(dirname, subdirname, filename);
 		}
 
-		return file_vec;
+		return data;
 	    }
 
-	    vector<uint8_t> load_file_from_zip(int id, string filename)
+	    int load_zip_internal(string zip_name)
 	    {
-		vector<uint8_t> file_vec;
+		if (front != NULL)
+		{
+		    return front->loadzip(zip_name);
+		}
+
+		return -1;
+	    }
+
+	    vector<uint8_t> read_file_zip_internal(int id, string dirname, string filename)
+	    {
+		vector<uint8_t> data;
 
 		if (front != NULL)
 		{
-		    file_vec = front->readfilefromzip(id, filename);
+		    data = front->readfilefromzip(id, dirname, filename);
 		}
 
-		return file_vec;
+		return data;
+	    }
+
+	    void close_zip_internal()
+	    {
+		if (front != NULL)
+		{
+		    front->closezip();
+		}
 	    }
 
 	    vector<berrnmemoryregion*> memory_regions;
 	    bool is_zip_loaded = false;
-    };
-
-    class LIBBLUEBERRN_API berrnaudiodevice
-    {
-	public:
-	    berrnaudiodevice()
-	    {
-
-	    }
-
-	    void set_sample_rates(uint32_t clk_rate, uint32_t sample_rate)
-	    {
-		out_step = get_clock_rate(clk_rate);
-		in_step = sample_rate;
-		out_time = 0.0f;
-	    }
-
-	    vector<int32_t> fetch_samples()
-	    {
-		while (out_step > out_time)
-		{
-		    clock_chip();
-		    out_time += in_step;
-		}
-
-		out_time -= out_step;
-
-		vector<int32_t> samples = get_samples();
-		return samples;
-	    }
-
-	    virtual uint32_t get_clock_rate(uint32_t clk_rate)
-	    {
-		return clk_rate;
-	    }
-
-	    virtual void clock_chip()
-	    {
-		return;
-	    }
-
-	    virtual vector<int32_t> get_samples()
-	    {
-		vector<int32_t> empty_samples;
-		return empty_samples;
-	    }
-
-	private:
-	    float out_step = 0.0f;
-	    float in_step = 0.0f;
-	    float out_time = 0.0f;
+	    bool is_dir_found = false;
+	    bool is_zip_found = false;
+	    int zip_id = -1;
     };
 
     class LIBBLUEBERRN_API berrnmixer
@@ -375,20 +425,20 @@ namespace berrn
 
 	    }
 
-	    void add_mono(int32_t sample, double gain = 1.0)
+	    void add_mono(int32_t sample, double gain)
 	    {
 		int32_t adjusted_sample = int32_t(double(sample) * gain);
 		mixed_samples[0] += adjusted_sample;
 		mixed_samples[1] += adjusted_sample;
 	    }
 
-	    void add_stereo(int32_t left, int32_t right, double gain = 1.0)
+	    void add_stereo(int32_t left, int32_t right, double gain)
 	    {
 		array<int32_t, 2> samples = {left, right};
 		add_stereo(samples, gain);
 	    }
 
-	    void add_stereo(array<int32_t, 2> samples, double gain = 1.0)
+	    void add_stereo(array<int32_t, 2> samples, double gain)
 	    {
 		for (int i = 0; i < 2; i++)
 		{
@@ -420,12 +470,170 @@ namespace berrn
 	    array<int32_t, 2> mixed_samples = {0, 0};
     };
 
+    class LIBBLUEBERRN_API berrnscreen
+    {
+	public:
+	    berrnscreen(BerrnScheduler &sched) : scheduler(sched)
+	    {
+		vblank_begin_timer = new BerrnTimer("VBlankBegin", scheduler, [&](int64_t, int64_t)
+		{
+		    vblank_begin();
+		});
+
+		vblank_end_timer = new BerrnTimer("VBlankEnd", scheduler, [&](int64_t, int64_t)
+		{
+		    vblank_end();
+		});
+	    }
+
+	    ~berrnscreen()
+	    {
+
+	    }
+
+	    int get_height() const
+	    {
+		return height;
+	    }
+
+	    int vpos()
+	    {
+		int64_t delta = (scheduler.get_current_time() - vblank_start_time);
+
+		int vpos = (delta / scan_time);
+
+		return ((max_y + 1 + vpos) % height);
+	    }
+
+	    int64_t time_until_pos(int vpos)
+	    {
+		vpos += (height - (max_y + 1));
+		vpos %= height;
+
+		int64_t target_delta = (vpos * scan_time);
+
+		int64_t current_delta = (scheduler.get_current_time() - vblank_start_time);
+
+		while (target_delta <= current_delta)
+		{
+		    target_delta += refresh_period;
+		}
+
+		return (target_delta - current_delta);
+	    }
+
+	    bool is_vblank()
+	    {
+		return (scheduler.get_current_time() < vblank_end_time);
+	    }
+
+	    void set_vblank_callback(berrncbline cb)
+	    {
+		vblank_callback = cb;
+	    }
+
+	    void set_raw(uint32_t pix_clock, uint16_t htotal, uint16_t hbend, uint16_t hbstart, uint16_t vtotal, uint16_t vbend, uint16_t vbstart)
+	    {
+		refresh_period = ((1e6 / pix_clock) * htotal * vtotal);
+		vblank_period = double(refresh_period) / vtotal * (vtotal - (vbstart - vbend));
+
+		width = htotal;
+		height = vtotal;
+
+		min_x = hbend;
+		max_x = (hbstart) ? (hbstart - 1) : (htotal - 1);
+		min_y = vbend;
+		max_y = (vbstart - 1);
+
+		scan_time = (refresh_period / height);
+	    }
+
+	    void init()
+	    {
+		vblank_begin_timer->start(time_until_vblank_start(), false);
+	    }
+
+	    void shutdown()
+	    {
+		vblank_begin_timer->stop();
+		vblank_end_timer->stop();
+	    }
+
+	private:
+	    BerrnScheduler &scheduler;
+
+	    BerrnTimer *vblank_begin_timer = NULL;
+	    BerrnTimer *vblank_end_timer = NULL;
+
+	    int64_t refresh_period = 0;
+	    int64_t vblank_period = 0;
+	    int width = 0;
+	    int height = 0;
+
+	    int min_x = 0;
+	    int max_x = 0;
+	    int min_y = 0;
+	    int max_y = 0;
+
+	    int64_t scan_time = 0;
+	    int64_t vblank_start_time = 0;
+	    int64_t vblank_end_time = 0;
+
+	    berrncbline vblank_callback;
+
+	    void vblank_begin()
+	    {
+		vblank_start_time = scheduler.get_current_time();
+		vblank_end_time = (vblank_start_time + vblank_period);
+
+		if (vblank_callback)
+		{
+		    vblank_callback(true);
+		}
+
+		vblank_begin_timer->start(time_until_vblank_start(), false);
+		vblank_end_timer->start(time_until_vblank_end(), false);
+	    }
+
+	    void vblank_end()
+	    {
+		if (vblank_callback)
+		{
+		    vblank_callback(false);
+		}
+	    }
+
+	    int64_t time_until_vblank_start()
+	    {
+		return time_until_pos(max_y + 1);
+	    }
+
+	    int64_t time_until_vblank_end()
+	    {
+		int64_t target_time = vblank_end_time;
+
+		if (!is_vblank())
+		{
+		    target_time += refresh_period;
+		}
+
+		return (target_time - scheduler.get_current_time());
+	    }
+    };
+
     class LIBBLUEBERRN_API berrndriver
     {
 	public:
 	    berrndriver()
 	    {
+		mixer_timer = new BerrnTimer("AudioMixer", scheduler, [&](int64_t, int64_t) {
+		    process_audio();
+		    output_audio();
+		});
 
+		random_seed = 0x9D14ABD7;
+
+		screen = new berrnscreen(scheduler);
 	    }
 
 	    ~berrndriver()
@@ -436,13 +644,15 @@ namespace berrn
 	    bool startdriver()
 	    {
 		cout << "Driver started" << endl;
-		final_samples.fill(0);
+		scheduler.reset();
+		mixer_timer->start(time_in_hz(get_sample_rate()), true);
 		return drvinit();
 	    }
 
 	    void stopdriver()
 	    {
 		drvshutdown();
+		scheduler.shutdown();
 		closedriver();
 		cout << "Driver stopped" << endl;
 	    }
@@ -467,62 +677,32 @@ namespace berrn
 		}
 	    }
 
-	    BerrnBitmap *getScreen()
+	    berrnscreen *get_screen()
 	    {
 		return screen;
 	    }
 
-	    void setScreen(BerrnBitmap *bitmap)
+	    BerrnBitmap *get_screen_bmp()
 	    {
-		screen = bitmap;
+		return screen_bmp;
 	    }
 
-	    bool setSoundLoop(int id, bool is_loop)
+	    void set_screen_bmp(BerrnBitmap *bitmap)
 	    {
-		if (front == NULL)
+		delete screen_bmp;
+		if (bitmap->format() == BerrnRGB)
 		{
-		    return false;
+		    BerrnBitmapRGB *bmp = reinterpret_cast<BerrnBitmapRGB*>(bitmap);
+		    int rot_flags = (get_flags() & berrn_rot_mask);
+		    screen_bmp = rotateBitmapRGB(bmp, rot_flags);
 		}
-
-		return front->setSoundLoop(id, is_loop);
-	    }
-
-	    int loadWAV(string filename)
-	    {
-		return loadSoundWAV(filename);
-	    }
-
-	    bool setSoundVol(int id, double vol)
-	    {
-		if (front == NULL)
+		else
 		{
-		    return false;
+		    screen_bmp = bitmap;
 		}
-
-		return front->setSoundVol(id, vol);
 	    }
 
-	    bool playSound(int id)
-	    {
-		if (front == NULL)
-		{
-		    return false;
-		}
-
-		return front->playSound(id);
-	    }
-
-	    bool stopSound(int id)
-	    {
-		if (front == NULL)
-		{
-		    return false;
-		}
-
-		return front->stopSound(id);
-	    }
-
-	    uint32_t getSampleRate()
+	    uint32_t get_sample_rate()
 	    {
 		if (front == NULL)
 		{
@@ -532,39 +712,23 @@ namespace berrn
 		return front->getSampleRate();
 	    }
 
-	    array<int16_t, 2> getRawSample()
+	    uint32_t gen_rand()
 	    {
-		if (front == NULL)
-		{
-		    cout << "Frontend is NULL" << endl;
-		    return {0, 0};
-		}
-
-		if (!front->hasSounds())
-		{
-		    cout << "Frontend has no sounds" << endl;
-		    return {0, 0};
-		}
-
-		return front->getMixedSamples();
+		random_seed = 1664525 * random_seed + 1013904223;
+		return ((random_seed >> 16) | (random_seed << 16));
 	    }
 
-	    void addMonoSample(int32_t sample)
+	    void add_mono_sample(int32_t sample, double gain = 1.0)
 	    {
-		mixer->add_mono(sample);
+		mixer->add_mono(sample, gain);
 	    }
 
-	    void addStereoSample(int32_t left, int32_t right)
+	    void add_stereo_sample(int32_t left, int32_t right, double gain = 1.0)
 	    {
-		mixer->add_stereo(left, right);
+		mixer->add_stereo(left, right, gain);
 	    }
 
-	    void mixSample(array<int16_t, 2> samples)
-	    {
-		addStereoSample(samples[0], samples[1]);
-	    }
-
-	    void outputAudio()
+	    void output_audio()
 	    {
 		mixer->output_sample();
 	    }
@@ -584,27 +748,52 @@ namespace berrn
 		    return false;
 		}
 
-		return rom_load->loadROM(entries);
+		return rom_load->loadROM(entries, parentname());
 	    }
 
 	    void closedriver()
 	    {
-		closeSounds();
 		if (rom_load != NULL)
 		{
 		    rom_load->close_files();
 		}
 	    }
 
+	    virtual uint32_t get_flags()
+	    {
+		return 0;
+	    }
+
 	    virtual void keychanged(BerrnInput key, bool is_pressed) = 0;
 
 	    virtual string drivername() = 0;
-	    virtual bool hasdriverROMs() = 0;
 	    virtual bool drvinit() = 0;
 	    virtual void drvshutdown() = 0;
 	    virtual void drvrun() = 0;
 
-	    virtual float get_framerate()
+	    virtual string parentname()
+	    {
+		return "";
+	    }
+
+	    virtual void process_audio()
+	    {
+		add_stereo_sample(0, 0);
+	    }
+
+	    void run_scheduler()
+	    {
+		int64_t schedule_time = scheduler.get_current_time();
+		int64_t frame_time = time_in_hz(get_framerate());
+
+		while (scheduler.get_current_time() < (schedule_time + frame_time))
+		{
+		    scheduler.timeslice();
+		}
+	    }
+
+
+	    virtual double get_framerate()
 	    {
 		return 60;
 	    }
@@ -621,6 +810,18 @@ namespace berrn
 		return rom_load->fetch_mem_region(tag);
 	    }
 
+	    BlueberrnFrontend *get_frontend()
+	    {
+		return front;
+	    }
+
+	    BerrnScheduler &get_scheduler()
+	    {
+		return scheduler;
+	    }
+
+	
+
 	protected:
 	    berrnmixer *mixer = NULL;
 
@@ -630,32 +831,8 @@ namespace berrn
 
 	    string samplespath = "";
 
-	    BerrnBitmap *screen = NULL;
-
-	    array<int16_t, 2> final_samples = {0, 0};
-
-	    int loadSoundWAV(string filename)
-	    {
-		if (front == NULL)
-		{
-		    return -1;
-		}
-
-		fs::path cur_path = fs::current_path();
-		cur_path.append("samples");
-		cur_path.append(drivername());
-		cur_path.append(filename);
-
-		return front->loadWAV(cur_path.string());
-	    }
-
-	    void closeSounds()
-	    {
-		if (front != NULL)
-		{
-		    front->freeSounds();
-		}
-	    }
+	    berrnscreen *screen = NULL;
+	    BerrnBitmap *screen_bmp = NULL;
 
 	    void closefiles()
 	    {
@@ -665,6 +842,154 @@ namespace berrn
 	    vector<berrnmemoryregion*> memory_regions;
 	    BlueberrnFrontend *front = NULL;
 	    berrnROM *rom_load = NULL;
+
+	    BerrnScheduler scheduler;
+	    BerrnTimer *mixer_timer = NULL;
+
+	    uint32_t random_seed = 0;
+    };
+
+    class LIBBLUEBERRN_API berrnaudiodevice
+    {
+	public:
+	    berrnaudiodevice(berrndriver &drv) : driver(drv)
+	    {
+
+	    }
+
+	    void init(uint32_t clk_rate)
+	    {
+		init_device();
+		out_step = get_clock_rate(clk_rate);
+		in_step = driver.get_sample_rate();
+		out_time = 0.0f;
+	    }
+
+	    void init()
+	    {
+		init_device();
+		out_step = driver.get_sample_rate();
+		in_step = driver.get_sample_rate();
+		out_time = 0.0f;
+	    }
+
+	    float get_sample_rate()
+	    {
+		return in_step;
+	    }
+
+	    vector<int32_t> fetch_samples()
+	    {
+		while (out_step > out_time)
+		{
+		    clock_chip();
+		    out_time += in_step;
+		}
+
+		out_time -= out_step;
+
+		vector<int32_t> samples = get_samples();
+		return samples;
+	    }
+
+	protected:
+	    virtual void init_device()
+	    {
+		return;
+	    }
+
+	    virtual void shutdown()
+	    {
+		return;
+	    }
+
+	    virtual uint32_t get_clock_rate(uint32_t clk_rate)
+	    {
+		return clk_rate;
+	    }
+
+	    virtual void clock_chip()
+	    {
+		return;
+	    }
+
+	    virtual vector<int32_t> get_samples()
+	    {
+		vector<int32_t> empty_samples;
+		return empty_samples;
+	    }
+
+	private:
+	    berrndriver &driver;
+	    float out_step = 0.0f;
+	    float in_step = 0.0f;
+	    float out_time = 0.0f;
+    };
+
+    class LIBBLUEBERRN_API berrnscanlinetimer
+    {
+	public:
+	    berrnscanlinetimer(berrndriver &drv) : driver(drv)
+	    {
+		scanline_timer = new BerrnTimer("Scanline", driver.get_scheduler(), [&](int64_t, int64_t)
+		{
+		    tick_scanline();
+		});
+	    }
+
+	    void configure(function<void(int)> callback, int first_vpos, int increment)
+	    {
+		m_callback = callback;
+		m_first_vpos = first_vpos;
+		m_increment = increment;
+	    }
+
+	    void init()
+	    {
+		m_first_time = true;
+		scanline_timer->start(time_zero(), false);
+	    }
+
+	    void shutdown()
+	    {
+		scanline_timer->stop();
+	    }
+
+	private:
+	    berrndriver &driver;
+
+	    function<void(int)> m_callback;
+	    int m_first_vpos = 0;
+	    int m_increment = 0;
+
+	    bool m_first_time = false;
+
+	    BerrnTimer *scanline_timer = NULL;
+
+	    void tick_scanline()
+	    {
+		auto screen = driver.get_screen();
+		int next_vpos = m_first_vpos;
+
+		if (!m_first_time)
+		{
+		    int vpos = screen->vpos();
+
+		    if (m_callback)
+		    {
+			m_callback(vpos);
+		    }
+
+		    if ((m_increment != 0) && (vpos + m_increment) < screen->get_height())
+		    {
+			next_vpos = (vpos + m_increment);
+		    }
+		}
+
+		m_first_time = false;
+
+		scanline_timer->start(screen->time_until_pos(next_vpos), false);
+	    }
     };
 
     inline vector<berrndriver*> drivers;
@@ -701,6 +1026,8 @@ namespace berrn
   		
 	return temp;
     }
+
+    
 };
 
 #endif // BERRN_DRIVER

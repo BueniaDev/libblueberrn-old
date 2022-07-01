@@ -49,7 +49,7 @@ class BerrnZ80Interface : public BeeZ80Interface
 
 	bool isSeperateOps()
 	{
-	    return true;
+	    return inter.isSeperateOps();
 	}
 
 	uint8_t readOpcode(uint16_t addr)
@@ -85,20 +85,32 @@ class BerrnZ80Processor : public BerrnProcessor
 
 	}
 
-	void fire_nmi()
+	void fire_nmi(bool is_pending = true)
 	{
-	    core.generate_nmi();
+	    core.generate_nmi(is_pending);
+	}
+
+	void fire_interrupt(bool is_line = true)
+	{
+	    is_irq_line = is_line;
+	    core.generate_interrupt(irq_opcode, is_irq_line);
 	}
 
 	void set_irq_vector(uint8_t opcode)
 	{
-	    core.generate_interrupt(opcode, is_irq_line);
+	    irq_opcode = opcode;
+	    core.generate_interrupt(irq_opcode, is_irq_line);
 	}
 
-	void fire_interrupt8(uint8_t opcode, bool is_line = true)
+	void fire_interrupt8(uint8_t opcode = 0xFF, bool is_line = true)
 	{
-	    core.generate_interrupt(opcode, is_line);
-	    is_irq_line = is_line;
+	    irq_opcode = opcode;
+	    fire_interrupt(is_line);
+	}
+
+	void clear_interrupt()
+	{
+	    fire_interrupt(false);
 	}
 
 	void set_prescalers(int cycle_pres, int m1_pres)
@@ -141,7 +153,7 @@ class BerrnZ80Processor : public BerrnProcessor
 	    current_cycles = static_cast<int64_t>(clock_freq * us / 1e6);
 	    cycles_left = current_cycles;
 
-	    while (cycles_left > 0)
+	    do
 	    {
 		if (is_stopped)
 		{
@@ -149,10 +161,12 @@ class BerrnZ80Processor : public BerrnProcessor
 		}
 		else
 		{
+		    // core.debugoutput();
 		    cycles_left -= core.runinstruction();
 		}
 	    }
-	    
+	    while (cycles_left > 0);
+
 	    return get_exec_time();
 	}
 
@@ -172,6 +186,16 @@ class BerrnZ80Processor : public BerrnProcessor
 	    core.debugoutput();
 	}
 
+	void set_dump()
+	{
+	    dump = true;
+	}
+
+	BeeZ80 &getCore()
+	{
+	    return core;
+	}
+
     private:
 	uint64_t clock_freq = 0;
 	BerrnZ80Interface *procinter = NULL;
@@ -183,7 +207,69 @@ class BerrnZ80Processor : public BerrnProcessor
 	bool is_halted = false;
 	bool dump = false;
 
+	uint8_t irq_opcode = 0;
 	bool is_irq_line = false;
+};
+
+class BerrnZ80CPU : public BerrnCPU
+{
+    public:
+	BerrnZ80CPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new BerrnZ80Processor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void setIRQVector(uint8_t opcode)
+	{
+	    get_processor().set_irq_vector(opcode);
+	}
+
+	void fireInterrupt(bool is_line = true)
+	{
+	    get_processor().fire_interrupt(is_line);
+	}
+
+	void fireInterrupt8(uint8_t opcode = 0xFF, bool is_line = true)
+	{
+	    get_processor().fire_interrupt8(opcode, is_line);
+	}
+
+	void clearInterrupt()
+	{
+	    get_processor().clear_interrupt();
+	}
+
+	void fireNMI(bool is_line = true)
+	{
+	    get_processor().fire_nmi(is_line);
+	}
+
+	void setPrescalers(int cycle_pres, int m1_pres)
+	{
+	    get_processor().set_prescalers(cycle_pres, m1_pres);
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
+	
 };
 
 #endif // LIBBLUEBERRN_Z80_H

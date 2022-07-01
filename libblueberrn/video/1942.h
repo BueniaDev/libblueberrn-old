@@ -34,50 +34,53 @@ namespace berrn
 	    berrn1942video(berrndriver &drv);
 	    ~berrn1942video();
 
-	    bool init();
+	    void init();
 	    void shutdown();
 
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t data);
+	    void updatePixels();
 
-	    uint8_t readSprites(uint16_t addr);
-	    void writeSprites(uint16_t addr, uint8_t data);
+	    uint8_t readBG(uint16_t addr);
+	    void writeBG(uint16_t addr, uint8_t data);
 
-	    void setScroll(bool is_msb, uint8_t data);
-	    void setPaletteBank(uint8_t data);
+	    uint8_t readFG(uint16_t addr);
+	    void writeFG(uint16_t addr, uint8_t data);
 
-	    void update_pixels();
+	    uint8_t readOBJ(uint16_t addr);
+	    void writeOBJ(uint16_t addr, uint8_t data);
+
+	    void writeScroll(bool is_msb, uint8_t data);
+	    void writePaletteBank(uint8_t data);
 
 	private:
 	    berrndriver &driver;
-	    BerrnBitmapRGB *bitmap = NULL;
-
-	    array<uint8_t, 0x800> fg_vram;
 	    array<uint8_t, 0x400> bg_vram;
-	    array<uint8_t, 0x80> sprite_ram;
+	    array<uint8_t, 0x800> fg_vram;
+	    array<uint8_t, 0x80> obj_ram;
 
-	    void init_palette();
+	    void updateBG();
+	    void updateSprites();
+	    void updateFG();
 
-	    int palette_bank = 0;
+	    void renderSprite(int sprite_num, int color, int xcoord, int ycoord);
 
-	    vector<uint8_t> bg_rom;
-	    vector<uint8_t> fg_rom;
+	    void initPalettes();
 
-	    array<uint8_t, 256> fg_pal;
-	    array<array<uint8_t, 256>, 4> bg_pal;
+	    vector<uint8_t> bg_tiles;
+	    vector<uint8_t> fg_tiles;
+	    vector<uint8_t> obj_tiles;
 
 	    array<berrnRGBA, 256> colors;
+	    array<array<uint8_t, 0x100>, 4> bg_palettes;
+	    array<uint8_t, 0x100> fg_palettes;
+	    array<uint8_t, 0x100> obj_palettes;
 
-	    vector<uint8_t> bg_ram;
-	    vector<uint8_t> fg_ram;
+	    uint16_t scrollx = 0;
+	    int palette_bank = 0;
 
-	    void update_background();
-	    void update_foreground();
+	    int clip_miny = 0;
+	    int clip_maxy = 0;
 
-	    uint16_t scroll_x = 0;
-
-	    void draw_bg_tile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord, bool xflip, bool yflip);
-	    void draw_fg_tile(uint32_t tile_num, uint32_t pal_num, int xcoord, int ycoord);
+	    BerrnBitmapRGB *bitmap = NULL;
     };
 };
 

@@ -23,11 +23,6 @@
 #include <driver.h>
 #include <cpu/intel8080.h>
 #include <machine/mb14241.h>
-#include <iostream>
-#include <algorithm>
-#include <functional>
-#include <vector>
-#include <string>
 using namespace berrn;
 using namespace std;
 
@@ -39,56 +34,39 @@ namespace berrn
 	    InvadersCore(berrndriver &drv);
 	    ~InvadersCore();
 
-	    bool init_core();
-	    void shutdown_core();
-	    void run_core();
+	    bool initcore();
+	    void stopcore();
+	    void runcore();
+	    void keychanged(BerrnInput key, bool is_pressed);
 
 	    uint8_t readCPU8(uint16_t addr);
 	    void writeCPU8(uint16_t addr, uint8_t data);
 	    uint8_t portIn(uint16_t port);
-	    void portOut(uint16_t port, uint8_t val);
-
-	    void key_changed(BerrnInput key, bool is_pressed);
+	    void portOut(uint16_t port, uint8_t data);
 
 	private:
 	    berrndriver &driver;
 
-	    BerrnScheduler scheduler;
-	    Berrn8080Processor *main_proc = NULL;
-	    BerrnCPU *main_cpu = NULL;
-
-	    vector<int> sound_IDs;
-
-	    void load_sound(string filename);
-
-	    void play_sound(int id, bool is_playing = true);
-
-	    void write_sound_port(int bank, uint8_t data);
-	    bool is_rising_edge(uint8_t data, uint8_t prev_data, int bit);
-	    bool is_falling_edge(uint8_t data, uint8_t prev_data, int bit);
-
-	    mb14241shifter shifter;
-
-	    uint8_t port1_val = 0;
-
-	    uint8_t prev_port3 = 0;
-	    uint8_t prev_port5 = 0;
+	    Berrn8080CPU *main_cpu = NULL;
 
 	    BerrnTimer *vblank_timer = NULL;
-	    BerrnTimer *interrupt_timer = NULL;
-	    BerrnTimer *sound_timer = NULL;
+	    BerrnTimer *irq_timer = NULL;
 
-	    vector<uint8_t> main_rom;
-	    array<uint8_t, 0x400> work_ram;
+	    vector<uint8_t> rom;
+	    array<uint8_t, 0x400> main_ram;
 	    array<uint8_t, 0x1C00> video_ram;
 
-	    void update_pixels();
+	    uint8_t port1 = 0;
 
 	    bool is_end_of_frame = false;
 
 	    BerrnBitmapRGB *bitmap = NULL;
 
-	    void debugPort(uint8_t val);
+	    void debugPort(uint8_t data);
+
+	    void updatePixels();
+
+	    mb14241shifter shifter;
     };
 
     class LIBBLUEBERRN_API driverinvaders : public berrndriver
@@ -98,7 +76,7 @@ namespace berrn
 	    ~driverinvaders();
 
 	    string drivername();
-	    bool hasdriverROMs();
+	    uint32_t get_flags();
 
 	    bool drvinit();
 	    void drvshutdown();
@@ -107,7 +85,7 @@ namespace berrn
 	    void keychanged(BerrnInput key, bool is_pressed);
 
 	private:
-	    InvadersCore *inv_core = NULL;
+	    InvadersCore *core = NULL;
     };
 };
 

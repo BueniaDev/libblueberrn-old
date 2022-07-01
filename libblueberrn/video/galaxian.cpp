@@ -1,6 +1,6 @@
 /*
     This file is part of libblueberrn.
-    Copyright (C) 2021 BueniaDev.
+    Copyright (C) 2022 BueniaDev.
 
     libblueberrn is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@ namespace berrn
 
     galaxianvideo::galaxianvideo(berrndriver &drv) : driver(drv)
     {
-	bitmap = new BerrnBitmapRGB(224, 256);
+	bitmap = new BerrnBitmapRGB(256, 224);
 	bitmap->clear();
     }
 
@@ -55,32 +55,20 @@ namespace berrn
 
     }
 
-    bool galaxianvideo::init()
+    void galaxianvideo::init()
     {
 	pal_rom = driver.get_rom_region("pal");
 	tile_rom = driver.get_rom_region("gfx");
-	tile_ram.resize((256 * 8 * 8 * 2), 0);
-	sprite_ram.resize((64 * 16 * 16 * 2), 0);
 	gfxDecodeSet(char_layout, tile_rom, tile_ram);
 	gfxDecodeSet(sprite_layout, tile_rom, sprite_ram);
 	video_ram.fill(0);
 	obj_ram.fill(0);
 	init_starfield();
-	return true;
-    }
-
-    void galaxianvideo::shutdown()
-    {
-	pal_rom.clear();
-	tile_rom.clear();
-	sprite_ram.clear();
-	tile_ram.clear();
-	bitmap->clear();
     }
 
     void galaxianvideo::init_starfield()
     {
-	// Initial setup derived from the MAME driver in galaxian.c(pp)
+	// Initial setup derived from MAME
 
 	int stars = 0;
 	uint32_t generator = 0;
@@ -113,13 +101,242 @@ namespace berrn
 
     void galaxianvideo::update_star_scroll()
     {
-	if (is_stars_enabled)
+	if (is_starfield_enabled)
 	{
 	    starfield_scroll_pos += 1;
 	}
 	else
 	{
 	    starfield_scroll_pos = 0;
+	}
+    }
+
+    void galaxianvideo::draw_star_pixel(int xpos, int ypos, int color)
+    {
+	color &= 0x3F;
+
+	array<uint8_t, 4> starmap = {0, 194, 214, 255};
+
+	int red = starmap.at((color & 0x3));
+	int green = starmap.at(((color >> 2) & 0x3));
+	int blue = starmap.at(((color >> 4) & 0x3));
+
+	bitmap->setPixel(xpos, ypos, fromRGB(red, green, blue));
+    }
+
+    void galaxianvideo::draw_starfield()
+    {
+	for (int i = 0; i < 2520; i++)
+	{
+	    int ypos = (starfield[i].ypos + starfield_scroll_pos);
+	    int xpos = ((starfield[i].xpos + (ypos >> 9)) & 0xFF);
+
+	    ypos = ((ypos & 0x1FF) / 2);
+
+	    if (testbit(xpos, 0) != testbit(ypos, 3))
+	    {
+		draw_star_pixel(ypos, (xpos - 16), starfield[i].color);
+	    }
+	}
+    }
+
+    void galaxianvideo::shutdown()
+    {
+	pal_rom.clear();
+	tile_rom.clear();
+	tile_ram.clear();
+	bitmap->clear();
+    }
+
+    void galaxianvideo::updatePixels()
+    {
+	update_star_scroll();
+	bitmap->fillcolor(black());
+
+	if (is_starfield_enabled)
+	{
+	    draw_starfield();
+	}
+
+	for (int col = 0; col < 32; col++)
+	{
+	    for (int row = 0; row < 32; row++)
+	    {
+		int offs = ((32 * col) + row);
+
+		uint8_t scroll = obj_ram.at(row * 2);
+		uint32_t color = (obj_ram.at((row * 2) + 1) & 7);
+
+		int cx = (row * 8);
+		int cy = ((col * 8) - 16);
+		
+		uint8_t tile_num = video_ram.at(offs);
+		draw_tile(tile_num, cx, cy, color, scroll);
+	    }
+	}
+
+	for (int y = 0; y < 224; y++)
+	{
+	    uint8_t shell = 0xFF;
+	    uint8_t missile = 0xFF;
+	    uint8_t y_eff = 0;
+
+	    y_eff = (y + 15);
+
+	    for (int i = 0; i < 3; i++)
+	    {
+		uint32_t bullet_offs = (0x60 + (i * 4));
+		uint8_t pos = uint8_t(obj_ram.at(bullet_offs + 1) + y_eff);
+
+		if (pos == 0xFF)
+		{
+		    shell = i;
+		}
+	    }
+
+	    y_eff = (y + 16);
+
+	    for (int i = 3; i < 8; i++)
+	    {
+		uint32_t bullet_offs = (0x60 + (i * 4));
+		uint8_t pos = uint8_t(obj_ram.at(bullet_offs + 1) + y_eff);
+
+		if (pos == 0xFF)
+		{
+		    if (i != 7)
+		    {
+			shell = i;
+		    }
+		    else
+		    {
+			missile = i;
+		    }
+		}
+	    }
+
+	    if (shell != 0xFF)
+	    {
+		uint32_t bullet_offs = (0x60 + (shell * 4));
+		uint32_t ypos = y;
+		uint32_t xpos = (255 - obj_ram.at(bullet_offs + 3));
+
+		xpos -= 4;
+
+		for (int i = 0; i < 4; i++)
+		{
+		    bitmap->setPixel(xpos, ypos, white());
+		    xpos += 1;
+		}
+	    }
+
+	    if (missile != 0xFF)
+	    {
+		uint32_t bullet_offs = (0x60 + (missile * 4));
+		uint32_t ypos = y;
+		uint32_t xpos = (255 - obj_ram.at(bullet_offs + 3));
+
+		xpos -= 4;
+
+		for (int i = 0; i < 4; i++)
+		{
+		    bitmap->setPixel(xpos, ypos, yellow());
+		    xpos += 1;
+		}
+	    }
+	}
+
+	for (int sprite = 7; sprite >= 0; sprite--)
+	{
+	    uint32_t sprite_offs = (0x40 + (sprite * 4));
+	    int xpos = (obj_ram.at(sprite_offs + 3) + 1);
+	    int ypos = (240 - obj_ram.at(sprite_offs));
+
+	    if (xpos < 8)
+	    {
+		continue;
+	    }
+
+	    uint8_t flip_attrib = obj_ram.at(sprite_offs + 1);
+
+	    if (sprite <= 2)
+	    {
+		ypos += 1;
+	    }
+
+	    bool is_flipy = testbit(flip_attrib, 7);
+	    bool is_flipx = testbit(flip_attrib, 6);
+
+	    uint8_t sprite_num = (flip_attrib & 0x3F);
+	    int color = (obj_ram.at(sprite_offs + 2) & 0x7);
+	    draw_sprite(sprite_num, xpos, ypos, is_flipx, is_flipy, color);
+	}
+
+	driver.set_screen_bmp(bitmap);
+    }
+
+    void galaxianvideo::draw_tile(uint32_t tile_num, int xcoord, int ycoord, int pal_num, int scroll)
+    {
+	if (!inRange(xcoord, 0, 256) || !inRange(ycoord, 0, 224))
+	{
+	    return;
+	}
+
+	int base_x = xcoord;
+	int base_y = ycoord;
+	int color_offs = (pal_num & 0x7);
+
+	for (int index = 0; index < 64; index++)
+	{
+	    int py = (index / 8);
+	    int px = (index % 8);
+
+	    uint8_t tile_color = tile_ram.at((tile_num * 64) + index);
+	    int xpos = (base_x + px);
+	    int ypos = (base_y + py);
+
+	    ypos = ((ypos - scroll) % 256);
+
+	    if (ypos <= -8)
+	    {
+		ypos += 256;
+	    }
+
+	    uint8_t color = pal_rom.at((color_offs * 4) + tile_color);
+	    set_pixel(xpos, ypos, color);
+	}
+    }
+
+    void galaxianvideo::draw_sprite(uint8_t sprite_num, int xcoord, int ycoord, bool flip_x, bool flip_y, int pal_num)
+    {
+	if (!inRange(xcoord, 0, 256) || !inRange(ycoord, 0, 224))
+	{
+	    return;
+	}
+
+	int color_offs = (pal_num & 0x7);
+
+	for (int pixel = 0; pixel < 256; pixel++)
+	{
+	    int py = (pixel / 16);
+	    int px = (pixel % 16);
+
+	    uint8_t sprite_color = sprite_ram.at((sprite_num * 256) + pixel);
+
+	    if (flip_x)
+	    {
+		px = (15 - px);
+	    }
+
+	    if (flip_y)
+	    {
+		py = (15 - py);
+	    }
+
+	    int xpos = (xcoord + px);
+	    int ypos = (ycoord + py);
+
+	    uint8_t color = pal_rom.at((color_offs * 4) + sprite_color);
+	    set_pixel(xpos, ypos, color);
 	}
     }
 
@@ -148,222 +365,36 @@ namespace berrn
 	bitmap->setPixel(xpos, ypos, fromRGB(red, green, blue));
     }
 
-    void galaxianvideo::draw_tile(uint8_t tile_num, int x, int y, int pal_num)
+    uint8_t galaxianvideo::readVRAM(int addr)
     {
-	if (!inRange(x, 0, 224) || !inRange(y, 0, 256))
-	{
-	    return;
-	}
-
-	int color_offs = (pal_num & 0x7);
-
-	for (int index = 0; index < 64; index++)
-	{
-	    int py = (index % 8);
-	    int px = (7 - (index / 8));
-
-	    uint8_t tile_color = tile_ram.at((tile_num * 64) + index);
-	    int ypos = (y + py);
-	    int xpos = (x + px);
-	    uint8_t color = pal_rom.at((color_offs * 4) + tile_color);
-	    set_pixel(xpos, ypos, color);
-	}
+	addr &= 0x3FF;
+	return video_ram.at(addr);
     }
 
-    void galaxianvideo::draw_sprite(uint8_t sprite_num, int x, int y, bool flip_x, bool flip_y, int pal_num)
+    void galaxianvideo::writeVRAM(int addr, uint8_t data)
     {
-	if (!inRange(x, 0, 224) || !inRange(y, 0, 256))
-	{
-	    return;
-	}
-
-	int color_offs = (pal_num & 0x7);
-
-	for (int index = 0; index < 256; index++)
-	{
-	    int py = (index % 16);
-	    int px = (15 - (index / 16));
-
-	    uint8_t sprite_color = sprite_ram.at((sprite_num * 256) + index);
-
-	    if (flip_x)
-	    {
-		px = (15 - px);
-	    }
-
-	    if (flip_y)
-	    {
-		py = (15 - py);
-	    }
-
-	    int xpos = (x + px);
-	    int ypos = (y + py);
-
-	    if (!inRange(xpos, 0, 224))
-	    {
-		continue;
-	    }
-
-	    uint8_t color = pal_rom.at((color_offs * 4) + sprite_color);
-	    set_pixel(xpos, ypos, color);
-	}
+	addr &= 0x3FF;
+	video_ram.at(addr) = data;
     }
 
-    void galaxianvideo::draw_star_pixel(int xpos, int ypos, int color)
+    uint8_t galaxianvideo::readORAM(int addr)
     {
-	color &= 0x3F;
-
-	array<uint8_t, 4> starmap = {0, 194, 214, 255};
-
-	int red = starmap.at((color & 0x3));
-	int green = starmap.at(((color >> 2) & 0x3));
-	int blue = starmap.at(((color >> 4) & 0x3));
-
-	bitmap->setPixel(xpos, ypos, fromRGB(red, green, blue));
+	addr &= 0xFF;
+	return obj_ram.at(addr);
     }
 
-    void galaxianvideo::draw_starfield()
+    void galaxianvideo::writeORAM(int addr, uint8_t data)
     {
-	for (int i = 0; i < 2520; i++)
-	{
-	    int ypos = starfield[i].ypos + starfield_scroll_pos;
-	    int xpos = ((starfield[i].xpos + (ypos >> 9)) & 0xFF);
-
-	    ypos = ((ypos & 0x1FF) / 2);
-
-	    if (testbit(xpos, 0) != testbit(ypos, 3))
-	    {
-		draw_star_pixel((xpos - 16), ypos, starfield[i].color);
-	    }
-	}
+	addr &= 0xFF;
+	obj_ram.at(addr) = data;
     }
 
-    void galaxianvideo::update_pixels()
+    void galaxianvideo::writeIO(int reg, bool line)
     {
-	update_star_scroll();
-	bitmap->fillcolor(black());
-
-	if (is_stars_enabled)
+	switch (reg)
 	{
-	    draw_starfield();
-	}
-
-	for (int y = 0; y < 32; y++)
-	{
-	    uint8_t scroll = obj_ram[(y * 2)];
-	    uint32_t color = (obj_ram[(y * 2) + 1] & 7);
-
-	    for (int x = 0; x < 32; x++)
-	    {
-		uint32_t offset = (y + ((31 - x) * 32));
-
-		int cx = ((((x * 8) + scroll) & 0xFF) - 16);
-		int cy = (y * 8);
-
-		if (inRange(cx, -7, 224))
-		{
-		    uint8_t char_code = video_ram[offset];
-		    draw_tile(char_code, cx, cy, color);
-		}
-	    }
-	}
-
-	for (int bullet = 0; bullet < 8; bullet++)
-	{
-	    uint32_t bullet_offs = (0x60 + (bullet * 4));
-	    int xpos = (obj_ram.at(bullet_offs + 1) - 16);
-	    int ypos = (255 - obj_ram.at(bullet_offs + 3));
-
-	    berrnRGBA bullet_color = (bullet == 7) ? yellow() : white();
-
-	    for (int index = 0; index < 4; index++)
-	    {
-		ypos -= 1;
-
-		if (ypos >= 0)
-		{
-		    bitmap->setPixel(xpos, ypos, bullet_color);
-		}
-	    }
-	}
-
-	for (int sprite = 7; sprite >= 0; sprite--)
-	{
-	    uint32_t sprite_offs = (0x40 + (sprite * 4));
-
-	    int ypos = (obj_ram.at(sprite_offs + 3) + 1);
-	    int xpos = (obj_ram.at(sprite_offs) - 16);
-
-	    if (ypos < 8)
-	    {
-		continue;
-	    }
-
-	    uint8_t flip_attrib = (obj_ram.at(sprite_offs + 1));
-
-	    bool is_yflip = testbit(flip_attrib, 6);
-	    bool is_xflip = testbit(flip_attrib, 7);
-
-	    if (sprite <= 2)
-	    {
-		xpos += 1;
-	    }
-
-	    if (!inRange(xpos, -16, 224))
-	    {
-		continue;
-	    }
-
-	    uint8_t sprite_num = (flip_attrib & 0x3F);
-
-	    int color = (obj_ram.at(sprite_offs + 2) & 0x7);
-	    draw_sprite(sprite_num, xpos, ypos, is_xflip, is_yflip, color);
-	}
-
-	driver.setScreen(bitmap);
-    }
-
-    uint8_t galaxianvideo::readByte(uint16_t addr)
-    {
-	uint8_t data = 0;
-	addr &= 0xFFF;
-
-	if (addr < 0x800)
-	{
-	    data = video_ram[(addr & 0x3FF)];
-	}
-	else
-	{
-	    data = obj_ram[(addr & 0xFF)];
-	}
-
-	return data;
-    }
-
-    void galaxianvideo::writeByte(uint16_t addr, uint8_t data)
-    {
-	addr &= 0xFFF;
-
-	if (addr < 0x800)
-	{
-	    video_ram[(addr & 0x3FF)] = data;
-	}
-	else
-	{
-	    obj_ram[(addr & 0xFF)] = data;
-	}
-    }
-
-    void galaxianvideo::update_latch(int addr, uint8_t data)
-    {
-	addr &= 3;
-	bool val = testbit(data, 0);
-
-	switch (addr)
-	{
-	    case 0: is_stars_enabled = val; break;
-	    case 1: is_flip_screenx = val; break;
-	    case 2: is_flip_screeny = val; break;
+	    case 0: is_starfield_enabled = line; break;
+	    default: break;
 	}
     }
 };

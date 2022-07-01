@@ -20,7 +20,7 @@
 #define LIBBLUEBERRN_M68K_H
 
 #include "m68k/Botsashi/Botsashi/botsashi.h"
-#include "scheduler.h"
+#include <driver.h>
 using namespace botsashi;
 using namespace berrn;
 
@@ -53,10 +53,9 @@ class BerrnM68KInterface : public BotsashiInterface
 	    return false;
 	}
 
-	void trapException(int val, Botsashi &m68k)
+	void trapException(int val)
 	{
 	    (void)val;
-	    (void)m68k;
 	    return;
 	}
 
@@ -86,7 +85,6 @@ class BerrnM68KProcessor : public BerrnProcessor
 	void init()
 	{
 	    core.init();
-	    core.reset_exception();
 	}
 
 	void shutdown()
@@ -96,7 +94,12 @@ class BerrnM68KProcessor : public BerrnProcessor
 
 	void reset()
 	{
-	    core.reset_exception();
+	    core.reset();
+	}
+
+	void fire_interrupt_level(int level, bool is_line = true)
+	{
+	    core.fire_irq(level, is_line);
 	}
 
 	int64_t get_exec_time()
@@ -117,7 +120,7 @@ class BerrnM68KProcessor : public BerrnProcessor
 	    current_cycles = static_cast<int64_t>(clock_freq * us / 1e6);
 	    cycles_left = current_cycles;
 
-	    while (cycles_left > 0)
+	    do
 	    {
 		if (is_stopped)
 		{
@@ -125,19 +128,10 @@ class BerrnM68KProcessor : public BerrnProcessor
 		}
 		else
 		{
-		    // core.debugoutput();
-		    int cycles = core.executenextinstr();
-
-		    /*
-		    if (cycles == 0)
-		    {
-			cout << "Instruction has unimplemented cycle timings" << endl;
-			exit(0);
-		    }
-		    */
-		    cycles_left -= cycles;
+		    cycles_left -= core.executenextinstr();
 		}
 	    }
+	    while (cycles_left > 0);
 
 	    return get_exec_time();
 	}
@@ -152,6 +146,12 @@ class BerrnM68KProcessor : public BerrnProcessor
 	    is_halted = is_halting;
 	}
 
+	void debug_output()
+	{
+	    cout << "M68K output: " << endl;
+	    core.debugoutput();
+	}
+
     private:
 	uint64_t clock_freq = 0;
 	BerrnM68KInterface *procinter = NULL;
@@ -161,6 +161,44 @@ class BerrnM68KProcessor : public BerrnProcessor
 	int64_t cycles_left = 0;
 	bool is_stopped = true;
 	bool is_halted = false;
+	bool dump = false;
+	int num_instrs = 0;
+};
+
+class BerrnM68KCPU : public BerrnCPU
+{
+    public:
+	BerrnM68KCPU(berrndriver &drv, uint64_t clk_freq, BerrnInterface &cb) : 
+	    BerrnCPU(drv.get_scheduler(), new BerrnM68KProcessor(clk_freq, cb))
+	{
+
+	}
+
+	void init()
+	{
+	    get_processor().init();
+	}
+
+	void shutdown()
+	{
+	    get_processor().shutdown();
+	}
+
+	void reset()
+	{
+	    get_processor().reset();
+	}
+
+	void fireInterruptLevel(int level, bool is_line = true)
+	{
+	    get_processor().fire_interrupt_level(level, is_line);
+	}
+
+	void debugOutput()
+	{
+	    get_processor().debug_output();
+	}
+	
 };
 
 #endif // LIBBLUEBERRN_M68K_H

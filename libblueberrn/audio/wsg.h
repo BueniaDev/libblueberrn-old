@@ -29,14 +29,14 @@ namespace berrn
     class wsg3device : public berrnaudiodevice
     {
 	public:
-	    wsg3device(berrndriver &drv) : driver(drv)
+	    wsg3device(berrndriver &drv) : berrnaudiodevice(drv), driver(drv)
 	    {
 
 	    }
 
-	    void init(string tag = "namco")
+	    void init_device()
 	    {
-		waveROM = driver.get_rom_region(tag);
+		waveROM = driver.get_rom_region("namco");
 		audio_core.init(waveROM);
 		audio_core.set_num_voices(3);
 	    }

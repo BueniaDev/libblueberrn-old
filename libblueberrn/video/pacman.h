@@ -34,47 +34,36 @@ namespace berrn
 	    pacmanvideo(berrndriver &drv);
 	    ~pacmanvideo();
 
-	    bool init();
+	    void init();
 	    void shutdown();
-
-	    uint8_t readByte(uint16_t addr);
-	    void writeByte(uint16_t addr, uint8_t data);
-
-	    uint8_t readSprites(int addr);
-	    void writeSprites(int addr, uint8_t data);
-
-	    void writeSpritePos(int addr, uint8_t data);
-
 	    void updatePixels();
 
-	    BerrnBitmapRGB *get_bitmap()
-	    {
-		return bitmap;
-	    }
+	    uint8_t readVRAM(uint16_t addr);
+	    void writeVRAM(uint16_t addr, uint8_t data);
+
+	    uint8_t readORAM(uint16_t addr);
+	    void writeORAM(int bank, uint16_t addr, uint8_t data);
 
 	private:
 	    berrndriver &driver;
 
-	    BerrnBitmapRGB *bitmap = NULL;
-
-	    array<uint8_t, 0x400> vram;
-	    array<uint8_t, 0x400> cram;
-	    array<uint8_t, 0x10> obj_ram;
-	    array<uint8_t, 0x10> obj_pos;
+	    array<uint8_t, 0x400> video_ram;
+	    array<uint8_t, 0x400> color_ram;
+	    array<array<uint8_t, 0x10>, 2> obj_ram;
 
 	    vector<uint8_t> pal_rom;
-	    vector<uint8_t> col_rom;
-	    vector<uint8_t> tile_rom;
-	    vector<uint8_t> sprite_rom;
+	    vector<uint8_t> color_rom;
 
 	    vector<uint8_t> tile_ram;
 	    vector<uint8_t> sprite_ram;
 
-	    void update_tiles();
-	    void update_sprites();
-	    void draw_tile(int tile_num, int pal_num, int xcoord, int ycoord);
-	    void draw_sprite(int sprite_num, int pal_num, int xcoord, int ycoord, bool flipx, bool flipy);
+	    void draw_tile(uint32_t tile_num, int xcoord, int ycoord, int pal_num);
+	    void draw_sprite(uint32_t sprite_num, int xcoord, int ycoord, int pal_num, bool flipx, bool flipy);
 	    void set_pixel(int xpos, int ypos, uint8_t color_num);
+
+	    BerrnBitmapRGB *bitmap = NULL;
+
+	    uint32_t tilemap_scan(uint32_t row, uint32_t col);
     };
 };
 

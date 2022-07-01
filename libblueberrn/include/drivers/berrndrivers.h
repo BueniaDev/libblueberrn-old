@@ -24,9 +24,21 @@
 #include <galaxian.h>
 #include <pacman.h>
 #include <galaga.h>
+#include <bosco.h>
 #include <system1.h>
 #include <rastan.h>
 #include <centipede.h>
 #include <1942.h>
+#include <1943.h>
+#include <tmnt.h>
+#include <mia.h>
+#include <punkshot.h>
+#include <xmen.h>
+#include <konmedal.h>
+#include <cave.h>
+#include <aliens.h>
+#include <blockhole.h>
+#include <bombjack.h>
+#include <gradius.h>
 
 #endif // BERRN_DRIVERS

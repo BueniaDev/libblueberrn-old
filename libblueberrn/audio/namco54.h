@@ -23,72 +23,12 @@
 #include <utils.h>
 #include <driver.h>
 #include <scheduler.h>
-#include <cpu/mb88xx.h>
 using namespace berrn;
 using namespace std;
 
 namespace berrn
 {
-    class namco54xxInterface : public BerrnInterface
-    {
-	public:
-	    namco54xxInterface(berrndriver &drv);
-	    ~namco54xxInterface();
 
-	    void init();
-	    void shutdown();
-
-	    uint8_t readOp8(uint16_t addr);
-	    uint8_t readCPU8(uint16_t addr);
-	    void writeCPU8(uint16_t addr, uint8_t data);
-	    uint8_t portIn(uint16_t addr);
-	    void portOut(uint16_t addr, uint8_t data);
-
-	    void write(uint8_t data);
-
-	private:
-	    berrndriver &driver;
-	    vector<uint8_t> mcu_rom;
-	    array<uint8_t, 0x40> mcu_data;
-
-	    uint8_t latched_cmd = 0;
-    };
-
-    class namco54xx
-    {
-	public:
-	    namco54xx(berrndriver &drv, BerrnScheduler &sched, uint64_t clk_freq);
-	    ~namco54xx();
-
-	    bool init();
-	    void shutdown();
-
-	    void chip_select(bool line);
-	    void write(uint8_t data);
-
-	    void set_reset_line(bool is_asserted);
-
-	    void set_irq_duration(int64_t duration)
-	    {
-		irq_duration = duration;
-	    }
-
-	private:
-	    berrndriver &driver;
-	    BerrnScheduler &scheduler;
-
-	    namco54xxInterface *mcu_inter = NULL;
-
-	    int64_t irq_duration = 0;
-
-	    BerrnTimer *set_latched_timer = NULL;
-	    BerrnTimer *irq_timer = NULL;
-
-	    BerrnMB8844Processor *mcu_proc = NULL;
-	    BerrnCPU *mcu_cpu = NULL;
-
-	    bool is_reset = false;
-    };
 };
 
 #endif // BERRN_NAMCO54_H

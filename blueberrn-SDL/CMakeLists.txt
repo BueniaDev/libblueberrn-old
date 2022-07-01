@@ -17,7 +17,7 @@ include_directories(${LIBBLUEBERRN_INCLUDE_DIR} ${SDL2_INCLUDE_DIRS})
 
 add_executable(${PROJECT_NAME} ${EXAMPLE_SOURCES})
 
-target_link_libraries(${PROJECT_NAME} libblueberrn imgui zip toml cmixer)
+target_link_libraries(${PROJECT_NAME} libblueberrn imgui zip toml)
 
 if (TARGET SDL2::SDL2)
     target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
