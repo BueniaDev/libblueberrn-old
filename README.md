@@ -3,7 +3,9 @@
 ## NOTICE
 
 This is the old branch of libblueberrn, which is no longer active nor currently maintained.
-A fresh rewrite is currently in the works.
+
+A fresh rewrite of this project is currently in the works, and this repository will be archived once said rewrite is complete.
+##
 
 Arcade machine emulation library, sorta
 
