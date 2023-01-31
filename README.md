@@ -3,7 +3,7 @@
 ## NOTICE
 
 This is the old branch of libblueberrn, which is no longer active nor currently maintained.
-Please use the latest [main](https://github.com/Buenia0/libblueberrn) branch instead.
+A fresh rewrite is currently in the works.
 
 Arcade machine emulation library, sorta
 
