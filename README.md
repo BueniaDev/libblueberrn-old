@@ -4,7 +4,7 @@
 
 This is the old branch of libblueberrn, which is no longer active nor currently maintained.
 
-A fresh rewrite of this project is currently in the works, and this repository will be archived once said rewrite is complete.
+Please follow this project's successor [here](https://github.com/BueniaDev/libblueberrn).
 ##
 
 Arcade machine emulation library, sorta
